@@ -1,5 +1,5 @@
 
-Machine learning engine for Orcus
+Machine Learning Engine for Orcus
 =================================
 
 TBD
