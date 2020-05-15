@@ -8,6 +8,7 @@
 #include <orcus/sax_ns_parser.hpp>
 #include <orcus/stream.hpp>
 #include <orcus/types.hpp>
+#include <orcus/string_pool.hpp>
 #include <orcus/xml_namespace.hpp>
 #include <boost/program_options.hpp>
 
@@ -21,18 +22,16 @@ using std::endl;
 
 class xml_handler : public orcus::sax_ns_handler
 {
+    orcus::string_pool& m_shared_pool;
     std::vector<orcus::xml_name_t> m_stack;
 
 public:
+    xml_handler(orcus::string_pool& pool) : m_shared_pool(pool) {}
 
     void start_element(const orcus::sax_ns_parser_element& elem)
     {
         m_stack.emplace_back(elem.ns, elem.name);
-
-        if (elem.ns)
-            return;
-
-        // TODO ...
+        m_shared_pool.intern(elem.name);
     }
 
     void end_element(const orcus::sax_ns_parser_element& elem)
@@ -44,25 +43,39 @@ public:
         m_stack.pop_back();
     }
 
-    void characters(const orcus::pstring& /*val*/, bool /*transient*/) {}
-
     void attribute(const orcus::pstring& /*name*/, const orcus::pstring& /*val*/) {}
 
-    void attribute(const orcus::sax_ns_parser_attribute& /*attr*/) {}
+    void attribute(const orcus::sax_ns_parser_attribute& attr)
+    {
+        m_shared_pool.intern(attr.name);
+    }
 };
 
-void parse_file(const std::string& filepath)
+class token_collector
 {
-    cout << "--" << endl;
-    orcus::file_content content(filepath.data());
-    cout << "filepath: " << filepath << " (size: " << content.size() << ")" << endl;
+    orcus::string_pool m_pool;
+    const size_t m_file_count;
+    size_t m_counter = 0;
 
-    orcus::xmlns_repository repo;
-    auto cxt = repo.create_context();
-    xml_handler hdl;
-    orcus::sax_ns_parser<xml_handler> parser(content.data(), content.size(), cxt, hdl);
-    parser.parse();
-}
+public:
+    token_collector(size_t file_count) : m_file_count(file_count) {}
+
+    void parse_file(const std::string& filepath)
+    {
+        orcus::file_content content(filepath.data());
+        cout << "[" << ++m_counter << "/" << m_file_count << "] filepath: " << filepath << " (size: " << content.size() << ")" << endl;
+        orcus::xmlns_repository repo;
+        auto cxt = repo.create_context();
+        xml_handler hdl(m_pool);
+        orcus::sax_ns_parser<xml_handler> parser(content.data(), content.size(), cxt, hdl);
+        parser.parse();
+    }
+
+    void dump_tokens()
+    {
+        m_pool.dump();
+    }
+};
 
 int main(int argc, char** argv)
 {
@@ -106,8 +119,11 @@ int main(int argc, char** argv)
 
     std::vector<std::string> input_files = vm["input-files"].as<std::vector<std::string>>();
 
+    token_collector collector(input_files.size());
     for (const std::string& filepath : input_files)
-        parse_file(filepath);
+        collector.parse_file(filepath);
+
+    collector.dump_tokens();
 
     return EXIT_SUCCESS;
 }
