@@ -43,7 +43,6 @@ const char* token_labels[] = {
     "valid",              // 19
 };
 
-constexpr orcus::xml_token_t XML_unknown            = 0;
 constexpr orcus::xml_token_t XML_column             = 1;
 constexpr orcus::xml_token_t XML_count              = 2;
 constexpr orcus::xml_token_t XML_doc                = 3;
@@ -69,16 +68,52 @@ class xml_handler : public orcus::sax_token_handler
     using xml_name_t = std::pair<orcus::xmlns_id_t, orcus::xml_token_t>;
     std::vector<xml_name_t> m_stack;
 
+    void check_parent(const xml_name_t& parent, const orcus::xml_token_t expected) const
+    {
+        if (parent != xml_name_t(orcus::XMLNS_UNKNOWN_ID, expected))
+            throw std::runtime_error("invalid structure");
+    }
+
 public:
 
     void start_element(const orcus::xml_token_element_t& elem)
     {
+        xml_name_t parent(orcus::XMLNS_UNKNOWN_ID, orcus::XML_UNKNOWN_TOKEN);
+        if (!m_stack.empty())
+            parent = m_stack.back();
+
         m_stack.emplace_back(elem.ns, elem.name);
 
         if (elem.ns)
+            // This XML structure doesn't use any namespaces.
             return;
 
-        // TODO ...
+        switch (elem.name)
+        {
+            case XML_doc:
+            {
+                check_parent(parent, orcus::XML_UNKNOWN_TOKEN);
+                break;
+            }
+            case XML_sheets:
+            {
+                check_parent(parent, XML_doc);
+                break;
+            }
+            case XML_sheet:
+            {
+                check_parent(parent, XML_sheets);
+
+                for (const auto& attr : elem.attrs)
+                {
+                    if (attr.name == XML_name)
+                        cout << "  * sheet: " << attr.value << endl;
+                }
+                break;
+            }
+            default:
+                ;
+        }
     }
 
     void end_element(const orcus::xml_token_element_t& elem)
