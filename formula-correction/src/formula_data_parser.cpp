@@ -5,9 +5,10 @@
  * file, You can obtain one at http://mozilla.org/MPL/2.0/.
  */
 
-#include <orcus/sax_ns_parser.hpp>
+#include <orcus/sax_token_parser.hpp>
 #include <orcus/stream.hpp>
 #include <orcus/types.hpp>
+#include <orcus/tokens.hpp>
 #include <orcus/xml_namespace.hpp>
 #include <boost/program_options.hpp>
 
@@ -19,13 +20,58 @@ using std::cout;
 using std::cerr;
 using std::endl;
 
-class xml_handler : public orcus::sax_ns_handler
+const char* token_labels[] = {
+    "???",                // 0
+    "column",             // 1
+    "count",              // 2
+    "doc",                // 3
+    "error",              // 4
+    "filepath",           // 5
+    "formula",            // 6
+    "formulas",           // 7
+    "name",               // 8
+    "named-expression",   // 9
+    "named-expressions",  // 10
+    "origin",             // 11
+    "row",                // 12
+    "s",                  // 13
+    "scope",              // 14
+    "sheet",              // 15
+    "sheets",             // 16
+    "token",              // 17
+    "type",               // 18
+    "valid",              // 19
+};
+
+constexpr orcus::xml_token_t XML_unknown            = 0;
+constexpr orcus::xml_token_t XML_column             = 1;
+constexpr orcus::xml_token_t XML_count              = 2;
+constexpr orcus::xml_token_t XML_doc                = 3;
+constexpr orcus::xml_token_t XML_error              = 4;
+constexpr orcus::xml_token_t XML_filepath           = 5;
+constexpr orcus::xml_token_t XML_formula            = 6;
+constexpr orcus::xml_token_t XML_formulas           = 7;
+constexpr orcus::xml_token_t XML_name               = 8;
+constexpr orcus::xml_token_t XML_named_expression   = 9;
+constexpr orcus::xml_token_t XML_named_expressions  = 10;
+constexpr orcus::xml_token_t XML_origin             = 11;
+constexpr orcus::xml_token_t XML_row                = 12;
+constexpr orcus::xml_token_t XML_s                  = 13;
+constexpr orcus::xml_token_t XML_scope              = 14;
+constexpr orcus::xml_token_t XML_sheet              = 15;
+constexpr orcus::xml_token_t XML_sheets             = 16;
+constexpr orcus::xml_token_t XML_token              = 17;
+constexpr orcus::xml_token_t XML_type               = 18;
+constexpr orcus::xml_token_t XML_valid              = 19;
+
+class xml_handler : public orcus::sax_token_handler
 {
-    std::vector<orcus::xml_name_t> m_stack;
+    using xml_name_t = std::pair<orcus::xmlns_id_t, orcus::xml_token_t>;
+    std::vector<xml_name_t> m_stack;
 
 public:
 
-    void start_element(const orcus::sax_ns_parser_element& elem)
+    void start_element(const orcus::xml_token_element_t& elem)
     {
         m_stack.emplace_back(elem.ns, elem.name);
 
@@ -35,20 +81,14 @@ public:
         // TODO ...
     }
 
-    void end_element(const orcus::sax_ns_parser_element& elem)
+    void end_element(const orcus::xml_token_element_t& elem)
     {
-        orcus::xml_name_t name(elem.ns, elem.name);
+        xml_name_t name(elem.ns, elem.name);
         if (m_stack.empty() || m_stack.back() != name)
             throw std::runtime_error("mis-matching element!");
 
         m_stack.pop_back();
     }
-
-    void characters(const orcus::pstring& /*val*/, bool /*transient*/) {}
-
-    void attribute(const orcus::pstring& /*name*/, const orcus::pstring& /*val*/) {}
-
-    void attribute(const orcus::sax_ns_parser_attribute& /*attr*/) {}
 };
 
 void parse_file(const std::string& filepath)
@@ -60,7 +100,8 @@ void parse_file(const std::string& filepath)
     orcus::xmlns_repository repo;
     auto cxt = repo.create_context();
     xml_handler hdl;
-    orcus::sax_ns_parser<xml_handler> parser(content.data(), content.size(), cxt, hdl);
+    orcus::tokens token_map(token_labels, ORCUS_N_ELEMENTS(token_labels));
+    orcus::sax_token_parser<xml_handler> parser(content.data(), content.size(), token_map, cxt, hdl);
     parser.parse();
 }
 
