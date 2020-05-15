@@ -13,6 +13,7 @@
 #include <boost/program_options.hpp>
 
 #include <iostream>
+#include <fstream>
 #include <vector>
 
 namespace po = boost::program_options;
@@ -71,9 +72,10 @@ public:
         parser.parse();
     }
 
-    void dump_tokens()
+    void write_tokens(std::ostream& os)
     {
-        m_pool.dump();
+        for (const auto& token : m_pool.get_interned_strings())
+            os << token << endl;
     }
 };
 
@@ -81,7 +83,8 @@ int main(int argc, char** argv)
 {
     po::options_description desc("Allowed options");
     desc.add_options()
-        ("help,h", "Print this help.");
+        ("help,h", "Print this help.")
+        ("output,o", po::value<std::string>(), "Output file to write tokens to.");
 
     po::options_description hidden("Hidden options");
     hidden.add_options()
@@ -123,8 +126,17 @@ int main(int argc, char** argv)
     for (const std::string& filepath : input_files)
         collector.parse_file(filepath);
 
-    collector.dump_tokens();
+    std::ostream* os = &cout; // write to stdout by default.
+    std::ofstream of;
 
+    if (vm.count("output"))
+    {
+        // write to specified output file instead.
+        of.open(vm["output"].as<std::string>());
+        os = &of;
+    }
+
+    collector.write_tokens(*os);
     return EXIT_SUCCESS;
 }
 
