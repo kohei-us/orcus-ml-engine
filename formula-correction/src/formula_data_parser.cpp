@@ -14,6 +14,7 @@
 
 #include <iostream>
 #include <vector>
+#include <unordered_set>
 
 namespace po = boost::program_options;
 using std::cout;
@@ -43,6 +44,7 @@ const char* token_labels[] = {
     "valid",              // 19
 };
 
+// skip 0 which is reserved for the unknown token.
 constexpr orcus::xml_token_t XML_column             = 1;
 constexpr orcus::xml_token_t XML_count              = 2;
 constexpr orcus::xml_token_t XML_doc                = 3;
@@ -65,8 +67,10 @@ constexpr orcus::xml_token_t XML_valid              = 19;
 
 class xml_handler : public orcus::sax_token_handler
 {
+    using token_set_t = std::unordered_set<orcus::xml_token_t>;
     using xml_name_t = std::pair<orcus::xmlns_id_t, orcus::xml_token_t>;
     std::vector<xml_name_t> m_stack;
+    const bool m_verbose;
 
     void check_parent(const xml_name_t& parent, const orcus::xml_token_t expected) const
     {
@@ -74,7 +78,15 @@ class xml_handler : public orcus::sax_token_handler
             throw std::runtime_error("invalid structure");
     }
 
+    void check_parent(const xml_name_t& parent, const token_set_t expected) const
+    {
+        if (!expected.count(parent.second))
+            throw std::runtime_error("invalid structure");
+    }
+
 public:
+
+    xml_handler(bool verbose) : m_verbose(verbose) {}
 
     void start_element(const orcus::xml_token_element_t& elem)
     {
@@ -107,8 +119,84 @@ public:
                 for (const auto& attr : elem.attrs)
                 {
                     if (attr.name == XML_name)
-                        cout << "  * sheet: " << attr.value << endl;
+                    {
+                        if (m_verbose)
+                            cout << "  * sheet: " << attr.value << endl;
+                    }
                 }
+                break;
+            }
+            case XML_named_expressions:
+            {
+                check_parent(parent, XML_doc);
+                break;
+            }
+            case XML_named_expression:
+            {
+                check_parent(parent, XML_named_expressions);
+
+                orcus::pstring name, scope;
+
+                for (const auto& attr : elem.attrs)
+                {
+                    switch (attr.name)
+                    {
+                        case XML_name:
+                            name = attr.value;
+                            break;
+                        case XML_scope:
+                            scope = attr.value;
+                            break;
+                    }
+                }
+
+                if (m_verbose)
+                    cout << "  * named expression: " << name << "  (scope: " << scope << ")" << endl;
+                break;
+            }
+            case XML_formulas:
+            {
+                check_parent(parent, XML_doc);
+                break;
+            }
+            case XML_formula:
+            {
+                check_parent(parent, XML_formulas);
+
+                orcus::pstring formula;
+
+                for (const auto& attr : elem.attrs)
+                {
+                    if (attr.name == XML_formula)
+                        formula = attr.value;
+                }
+
+                if (m_verbose)
+                    cout << "  * formula: " << formula << endl;
+                break;
+            }
+            case XML_token:
+            {
+                check_parent(parent, {XML_formula, XML_named_expression});
+
+                orcus::pstring s, type;
+
+                for (const auto& attr : elem.attrs)
+                {
+                    switch (attr.name)
+                    {
+                        case XML_s:
+                            s = attr.value;
+                            break;
+                        case XML_type:
+                            type = attr.value;
+                            break;
+                    }
+                }
+
+                if (m_verbose)
+                    cout << "    * token: '" << s << "' (type: " << type << ")" << endl;
+
                 break;
             }
             default:
@@ -126,7 +214,7 @@ public:
     }
 };
 
-void parse_file(const std::string& filepath)
+void parse_file(const std::string& filepath, bool verbose)
 {
     cout << "--" << endl;
     orcus::file_content content(filepath.data());
@@ -134,7 +222,7 @@ void parse_file(const std::string& filepath)
 
     orcus::xmlns_repository repo;
     auto cxt = repo.create_context();
-    xml_handler hdl;
+    xml_handler hdl(verbose);
     orcus::tokens token_map(token_labels, ORCUS_N_ELEMENTS(token_labels));
     orcus::sax_token_parser<xml_handler> parser(content.data(), content.size(), token_map, cxt, hdl);
     parser.parse();
@@ -142,9 +230,12 @@ void parse_file(const std::string& filepath)
 
 int main(int argc, char** argv)
 {
+    bool verbose = false;
+
     po::options_description desc("Allowed options");
     desc.add_options()
-        ("help,h", "Print this help.");
+        ("help,h", "Print this help.")
+        ("verbose,v", po::bool_switch(&verbose), "Verbose output.");
 
     po::options_description hidden("Hidden options");
     hidden.add_options()
@@ -183,7 +274,7 @@ int main(int argc, char** argv)
     std::vector<std::string> input_files = vm["input-files"].as<std::vector<std::string>>();
 
     for (const std::string& filepath : input_files)
-        parse_file(filepath);
+        parse_file(filepath, verbose);
 
     return EXIT_SUCCESS;
 }
