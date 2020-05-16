@@ -70,7 +70,9 @@ class xml_handler : public orcus::sax_token_handler
     using token_set_t = std::unordered_set<orcus::xml_token_t>;
     using xml_name_t = std::pair<orcus::xmlns_id_t, orcus::xml_token_t>;
     std::vector<xml_name_t> m_stack;
+
     const bool m_verbose;
+    bool m_valid_formula = false;
 
     void check_parent(const xml_name_t& parent, const orcus::xml_token_t expected) const
     {
@@ -136,6 +138,7 @@ public:
                 check_parent(parent, XML_named_expressions);
 
                 orcus::pstring name, scope;
+                m_valid_formula = false;
 
                 for (const auto& attr : elem.attrs)
                 {
@@ -167,11 +170,18 @@ public:
 
                 for (const auto& attr : elem.attrs)
                 {
-                    if (attr.name == XML_formula)
-                        formula = attr.value;
+                    switch (attr.name)
+                    {
+                        case XML_formula:
+                            formula = attr.value;
+                            break;
+                        case XML_valid:
+                            m_valid_formula = attr.value == "true";
+                            break;
+                    }
                 }
 
-                if (m_verbose)
+                if (m_verbose && m_valid_formula)
                     cout << "  * formula: " << formula << endl;
                 break;
             }
@@ -194,7 +204,7 @@ public:
                     }
                 }
 
-                if (m_verbose)
+                if (m_verbose && m_valid_formula)
                     cout << "    * token: '" << s << "' (type: " << type << ")" << endl;
 
                 break;
@@ -209,6 +219,17 @@ public:
         xml_name_t name(elem.ns, elem.name);
         if (m_stack.empty() || m_stack.back() != name)
             throw std::runtime_error("mis-matching element!");
+
+        if (elem.ns == orcus::XMLNS_UNKNOWN_ID)
+        {
+            switch (elem.name)
+            {
+                case XML_formula:
+                {
+                    break;
+                }
+            }
+        }
 
         m_stack.pop_back();
     }
