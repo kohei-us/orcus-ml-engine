@@ -10,13 +10,14 @@
 #include <orcus/types.hpp>
 #include <orcus/tokens.hpp>
 #include <orcus/xml_namespace.hpp>
+#include <mdds/sorted_string_map.hpp>
+#include <ixion/formula_function_opcode.hpp>
 #include <boost/program_options.hpp>
 
 #include <iostream>
 #include <vector>
 #include <unordered_set>
 
-#include <mdds/sorted_string_map.hpp>
 
 namespace po = boost::program_options;
 using std::cout;
@@ -314,6 +315,16 @@ public:
 
                             if (m_verbose)
                                 cout << ", op-type: " << ot;
+                            break;
+                        }
+                        case token_type::t_function:
+                        {
+                            ixion::formula_function_t fft = ixion::get_formula_function_opcode(s.data(), s.size());
+                            if (fft == ixion::formula_function_t::func_unknown)
+                                throw std::runtime_error("unknown function!");
+
+                            if (m_verbose)
+                                cout << ", func-id: " << int(fft) << " (" << ixion::get_formula_function_name(fft) << ")";
                             break;
                         }
                     }
