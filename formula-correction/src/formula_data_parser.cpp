@@ -176,6 +176,65 @@ class xml_handler : public orcus::sax_token_handler
             throw std::runtime_error("invalid structure");
     }
 
+    void start_token(const xml_name_t parent, const orcus::xml_token_element_t& elem)
+    {
+        check_parent(parent, {XML_formula, XML_named_expression});
+
+        if (!m_valid_formula)
+            return;
+
+        orcus::pstring s, type;
+
+        for (const auto& attr : elem.attrs)
+        {
+            switch (attr.name)
+            {
+                case XML_s:
+                    s = attr.value;
+                    break;
+                case XML_type:
+                    type = attr.value;
+                    break;
+            }
+        }
+
+        token_type::v tt = token_type::get().find(type.data(), type.size());
+        if (tt == token_type::t_unknown)
+            throw std::runtime_error("unknown token type!");
+
+        if (m_verbose)
+            cout << "    * token: '" << s << "'; type: " << type << " (" << tt << ")";
+
+        op_type::v ot = op_type::op_unknown;
+
+        switch (tt)
+        {
+            case token_type::t_operator:
+            {
+                ot = op_type::get().find(s.data(), s.size());
+                if (ot == op_type::op_unknown)
+                    throw std::runtime_error("unknown operator!");
+
+                if (m_verbose)
+                    cout << ", op-type: " << ot;
+                break;
+            }
+            case token_type::t_function:
+            {
+                ixion::formula_function_t fft = ixion::get_formula_function_opcode(s.data(), s.size());
+                if (fft == ixion::formula_function_t::func_unknown)
+                    throw std::runtime_error("unknown function!");
+
+                if (m_verbose)
+                    cout << ", func-id: " << int(fft) << " (" << ixion::get_formula_function_name(fft) << ")";
+                break;
+            }
+        }
+
+        if (m_verbose)
+            cout << endl;
+    }
+
 public:
 
     xml_handler(bool verbose) : m_verbose(verbose) {}
@@ -276,65 +335,8 @@ public:
                 break;
             }
             case XML_token:
-            {
-                check_parent(parent, {XML_formula, XML_named_expression});
-
-                orcus::pstring s, type;
-
-                for (const auto& attr : elem.attrs)
-                {
-                    switch (attr.name)
-                    {
-                        case XML_s:
-                            s = attr.value;
-                            break;
-                        case XML_type:
-                            type = attr.value;
-                            break;
-                    }
-                }
-
-                if (m_valid_formula)
-                {
-                    token_type::v tt = token_type::get().find(type.data(), type.size());
-                    if (tt == token_type::t_unknown)
-                        throw std::runtime_error("unknown token type!");
-
-                    if (m_verbose)
-                        cout << "    * token: '" << s << "'; type: " << type << " (" << tt << ")";
-
-                    op_type::v ot = op_type::op_unknown;
-
-                    switch (tt)
-                    {
-                        case token_type::t_operator:
-                        {
-                            ot = op_type::get().find(s.data(), s.size());
-                            if (ot == op_type::op_unknown)
-                                throw std::runtime_error("unknown operator!");
-
-                            if (m_verbose)
-                                cout << ", op-type: " << ot;
-                            break;
-                        }
-                        case token_type::t_function:
-                        {
-                            ixion::formula_function_t fft = ixion::get_formula_function_opcode(s.data(), s.size());
-                            if (fft == ixion::formula_function_t::func_unknown)
-                                throw std::runtime_error("unknown function!");
-
-                            if (m_verbose)
-                                cout << ", func-id: " << int(fft) << " (" << ixion::get_formula_function_name(fft) << ")";
-                            break;
-                        }
-                    }
-
-                    if (m_verbose)
-                        cout << endl;
-                }
-
+                start_token(parent, elem);
                 break;
-            }
             default:
                 ;
         }
