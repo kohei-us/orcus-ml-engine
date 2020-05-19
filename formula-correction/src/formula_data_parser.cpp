@@ -16,10 +16,99 @@
 #include <vector>
 #include <unordered_set>
 
+#include <mdds/sorted_string_map.hpp>
+
 namespace po = boost::program_options;
 using std::cout;
 using std::cerr;
 using std::endl;
+
+namespace op_type {
+
+enum v : uint8_t
+{
+    op_unknown = 0,   // 0
+    op_plus,          // 1
+    op_minus,         // 2
+    op_divide,        // 3
+    op_multiply,      // 4
+    op_exponent,      // 5
+    op_concat,        // 6
+    op_equal,         // 7
+    op_not_equal,     // 8
+    op_less,          // 9
+    op_greater,       // 10
+    op_less_equal,    // 11
+    op_greater_equal, // 12
+    op_open,          // 13
+    op_close,         // 14
+    op_sep,           // 15
+};
+
+typedef mdds::sorted_string_map<v> map_type;
+
+// Keys must be sorted.
+const std::vector<map_type::entry> entries =
+{
+    { ORCUS_ASCII("&"), op_concat },
+    { ORCUS_ASCII("("), op_open },
+    { ORCUS_ASCII(")"), op_close },
+    { ORCUS_ASCII("*"), op_multiply },
+    { ORCUS_ASCII("+"), op_plus },
+    { ORCUS_ASCII(","), op_sep },
+    { ORCUS_ASCII("-"), op_minus },
+    { ORCUS_ASCII("/"), op_divide },
+    { ORCUS_ASCII("<"), op_less },
+    { ORCUS_ASCII("<="), op_less_equal },
+    { ORCUS_ASCII("<>"), op_not_equal },
+    { ORCUS_ASCII("="), op_equal },
+    { ORCUS_ASCII(">"), op_greater },
+    { ORCUS_ASCII(">="), op_greater_equal },
+    { ORCUS_ASCII("^"), op_exponent },
+};
+
+const map_type& get()
+{
+    static map_type mt(entries.data(), entries.size(), op_unknown);
+    return mt;
+}
+
+} // namespace op_type
+
+namespace token_type {
+
+enum v : uint8_t
+{
+    t_unknown = 0, // 0
+    t_error,       // 1
+    t_function,    // 2
+    t_name,        // 3
+    t_operator,    // 4
+    t_reference,   // 5
+    t_value,       // 6
+};
+
+typedef mdds::sorted_string_map<v> map_type;
+
+// Keys must be sorted.
+const std::vector<map_type::entry> entries =
+{
+    { ORCUS_ASCII("error"),     t_error     },
+    { ORCUS_ASCII("function"),  t_function  },
+    { ORCUS_ASCII("name"),      t_name      },
+    { ORCUS_ASCII("operator"),  t_operator  },
+    { ORCUS_ASCII("reference"), t_reference },
+    { ORCUS_ASCII("unknown"),   t_unknown   },
+    { ORCUS_ASCII("value"),     t_value     },
+};
+
+const map_type& get()
+{
+    static map_type mt(entries.data(), entries.size(), t_unknown);
+    return mt;
+}
+
+} // namespace token_type
 
 const char* token_labels[] = {
     "???",                // 0
@@ -204,8 +293,34 @@ public:
                     }
                 }
 
-                if (m_verbose && m_valid_formula)
-                    cout << "    * token: '" << s << "' (type: " << type << ")" << endl;
+                if (m_valid_formula)
+                {
+                    token_type::v tt = token_type::get().find(type.data(), type.size());
+                    if (tt == token_type::t_unknown)
+                        throw std::runtime_error("unknown token type!");
+
+                    if (m_verbose)
+                        cout << "    * token: '" << s << "'; type: " << type << " (" << tt << ")";
+
+                    op_type::v ot = op_type::op_unknown;
+
+                    switch (tt)
+                    {
+                        case token_type::t_operator:
+                        {
+                            ot = op_type::get().find(s.data(), s.size());
+                            if (ot == op_type::op_unknown)
+                                throw std::runtime_error("unknown operator!");
+
+                            if (m_verbose)
+                                cout << ", op-type: " << ot;
+                            break;
+                        }
+                    }
+
+                    if (m_verbose)
+                        cout << endl;
+                }
 
                 break;
             }
