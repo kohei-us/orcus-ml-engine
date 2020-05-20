@@ -17,7 +17,7 @@
 #include <iostream>
 #include <vector>
 #include <unordered_set>
-
+#include <fstream>
 
 namespace po = boost::program_options;
 using std::cout;
@@ -164,6 +164,8 @@ class xml_handler : public orcus::sax_token_handler
     using token_set_t = std::unordered_set<orcus::xml_token_t>;
     using xml_name_t = std::pair<orcus::xmlns_id_t, orcus::xml_token_t>;
 
+    std::ofstream& m_of;
+
     std::vector<xml_name_t> m_stack;
     std::vector<uint16_t> m_formula_tokens;
 
@@ -223,16 +225,25 @@ class xml_handler : public orcus::sax_token_handler
             }
         }
 
+        if (!m_valid_formula)
+            return;
+
         m_formula_tokens.clear();
 
-        if (m_verbose && m_valid_formula)
+        if (m_verbose)
             cout << "  * formula: " << formula << endl;
+
+        m_of << formula << endl;
     }
 
     void end_formula()
     {
         if (m_verbose)
             cout << "    * formula tokens: " << m_formula_tokens.size() << endl;
+
+        // Write the tokens to the output file.
+        std::copy(m_formula_tokens.begin(), m_formula_tokens.end(), std::ostream_iterator<uint16_t>(m_of, ","));
+        m_of << endl;
     }
 
     void start_token(const xml_name_t parent, const orcus::xml_token_element_t& elem)
@@ -302,7 +313,7 @@ class xml_handler : public orcus::sax_token_handler
 
 public:
 
-    xml_handler(bool verbose) : m_verbose(verbose) {}
+    xml_handler(std::ofstream& of, bool verbose) : m_of(of), m_verbose(verbose) {}
 
     void start_element(const orcus::xml_token_element_t& elem)
     {
@@ -407,19 +418,32 @@ public:
     }
 };
 
-void parse_file(const std::string& filepath, bool verbose)
+class processor
 {
-    cout << "--" << endl;
-    orcus::file_content content(filepath.data());
-    cout << "filepath: " << filepath << " (size: " << content.size() << ")" << endl;
+    std::ofstream m_of;
+    const bool m_verbose;
 
-    orcus::xmlns_repository repo;
-    auto cxt = repo.create_context();
-    xml_handler hdl(verbose);
-    orcus::tokens token_map(token_labels, ORCUS_N_ELEMENTS(token_labels));
-    orcus::sax_token_parser<xml_handler> parser(content.data(), content.size(), token_map, cxt, hdl);
-    parser.parse();
-}
+public:
+    processor(const std::string& output_path, bool verbose) :
+        m_of(output_path.data()), m_verbose(verbose) {}
+
+    processor(const processor&) = delete;
+
+    void parse_file(const std::string& filepath)
+    {
+        cout << "--" << endl;
+        orcus::file_content content(filepath.data());
+        cout << "filepath: " << filepath << " (size: " << content.size() << ")" << endl;
+
+        orcus::xmlns_repository repo;
+        auto cxt = repo.create_context();
+        xml_handler hdl(m_of, m_verbose);
+        orcus::tokens token_map(token_labels, ORCUS_N_ELEMENTS(token_labels));
+        orcus::sax_token_parser<xml_handler> parser(content.data(), content.size(), token_map, cxt, hdl);
+        parser.parse();
+    }
+};
+
 
 int main(int argc, char** argv)
 {
@@ -428,7 +452,8 @@ int main(int argc, char** argv)
     po::options_description desc("Allowed options");
     desc.add_options()
         ("help,h", "Print this help.")
-        ("verbose,v", po::bool_switch(&verbose), "Verbose output.");
+        ("verbose,v", po::bool_switch(&verbose), "Verbose output.")
+        ("output,o", po::value<std::string>(), "Output file path.");
 
     po::options_description hidden("Hidden options");
     hidden.add_options()
@@ -461,13 +486,21 @@ int main(int argc, char** argv)
         return EXIT_SUCCESS;
     }
 
+    if (!vm.count("output"))
+    {
+        cerr << "output file path is required." << endl;
+        return EXIT_FAILURE;
+    }
+
     if (!vm.count("input-files"))
         return EXIT_SUCCESS;
 
     std::vector<std::string> input_files = vm["input-files"].as<std::vector<std::string>>();
 
+    processor p(vm["output"].as<std::string>(), verbose);
+
     for (const std::string& filepath : input_files)
-        parse_file(filepath, verbose);
+        p.parse_file(filepath);
 
     return EXIT_SUCCESS;
 }
