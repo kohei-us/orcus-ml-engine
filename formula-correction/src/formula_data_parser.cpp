@@ -157,23 +157,82 @@ constexpr orcus::xml_token_t XML_valid              = 19;
 
 class xml_handler : public orcus::sax_token_handler
 {
+    // 3 bits (0-7) for token type (1-6),
+    // 4 bits (0-15) for operator type (1-15),
+    // 9 bits (0-511) for function type (1-323).
+
     using token_set_t = std::unordered_set<orcus::xml_token_t>;
     using xml_name_t = std::pair<orcus::xmlns_id_t, orcus::xml_token_t>;
+
     std::vector<xml_name_t> m_stack;
+    std::vector<uint16_t> m_formula_tokens;
 
     const bool m_verbose;
     bool m_valid_formula = false;
 
-    void check_parent(const xml_name_t& parent, const orcus::xml_token_t expected) const
+    static void check_parent(const xml_name_t& parent, const orcus::xml_token_t expected)
     {
         if (parent != xml_name_t(orcus::XMLNS_UNKNOWN_ID, expected))
             throw std::runtime_error("invalid structure");
     }
 
-    void check_parent(const xml_name_t& parent, const token_set_t expected) const
+    static void check_parent(const xml_name_t& parent, const token_set_t expected)
     {
         if (!expected.count(parent.second))
             throw std::runtime_error("invalid structure");
+    }
+
+    static uint16_t encode_operator(const op_type::v ot)
+    {
+        if (ot > 15u)
+            throw std::runtime_error("operator type value too large!");
+
+        uint16_t encoded = ot << 3;
+        encoded += token_type::t_operator;
+        return encoded;
+    }
+
+    static uint16_t encode_function(const ixion::formula_function_t fft)
+    {
+        uint16_t fft_v = uint16_t(fft);
+
+        if (fft_v > 511u)
+            throw std::runtime_error("function type value too large!");
+
+        uint16_t encoded = fft_v << 3;
+        encoded += token_type::t_function;
+        return encoded;
+    }
+
+    void start_formula(const xml_name_t parent, const orcus::xml_token_element_t& elem)
+    {
+        check_parent(parent, XML_formulas);
+
+        orcus::pstring formula;
+
+        for (const auto& attr : elem.attrs)
+        {
+            switch (attr.name)
+            {
+                case XML_formula:
+                    formula = attr.value;
+                    break;
+                case XML_valid:
+                    m_valid_formula = attr.value == "true";
+                    break;
+            }
+        }
+
+        m_formula_tokens.clear();
+
+        if (m_verbose && m_valid_formula)
+            cout << "  * formula: " << formula << endl;
+    }
+
+    void end_formula()
+    {
+        if (m_verbose)
+            cout << "    * formula tokens: " << m_formula_tokens.size() << endl;
     }
 
     void start_token(const xml_name_t parent, const orcus::xml_token_element_t& elem)
@@ -205,15 +264,17 @@ class xml_handler : public orcus::sax_token_handler
         if (m_verbose)
             cout << "    * token: '" << s << "'; type: " << type << " (" << tt << ")";
 
-        op_type::v ot = op_type::op_unknown;
+        uint16_t encoded = tt;
 
         switch (tt)
         {
             case token_type::t_operator:
             {
-                ot = op_type::get().find(s.data(), s.size());
+                op_type::v ot = op_type::get().find(s.data(), s.size());
                 if (ot == op_type::op_unknown)
                     throw std::runtime_error("unknown operator!");
+
+                encoded = encode_operator(ot);
 
                 if (m_verbose)
                     cout << ", op-type: " << ot;
@@ -225,14 +286,18 @@ class xml_handler : public orcus::sax_token_handler
                 if (fft == ixion::formula_function_t::func_unknown)
                     throw std::runtime_error("unknown function!");
 
+                encoded = encode_function(fft);
+
                 if (m_verbose)
                     cout << ", func-id: " << int(fft) << " (" << ixion::get_formula_function_name(fft) << ")";
                 break;
             }
         }
 
+        m_formula_tokens.push_back(encoded);
+
         if (m_verbose)
-            cout << endl;
+            cout << ", encoded: " << encoded << endl;
     }
 
 public:
@@ -307,33 +372,11 @@ public:
                 break;
             }
             case XML_formulas:
-            {
                 check_parent(parent, XML_doc);
                 break;
-            }
             case XML_formula:
-            {
-                check_parent(parent, XML_formulas);
-
-                orcus::pstring formula;
-
-                for (const auto& attr : elem.attrs)
-                {
-                    switch (attr.name)
-                    {
-                        case XML_formula:
-                            formula = attr.value;
-                            break;
-                        case XML_valid:
-                            m_valid_formula = attr.value == "true";
-                            break;
-                    }
-                }
-
-                if (m_verbose && m_valid_formula)
-                    cout << "  * formula: " << formula << endl;
+                start_formula(parent, elem);
                 break;
-            }
             case XML_token:
                 start_token(parent, elem);
                 break;
@@ -354,6 +397,7 @@ public:
             {
                 case XML_formula:
                 {
+                    end_formula();
                     break;
                 }
             }
