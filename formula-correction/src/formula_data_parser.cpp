@@ -51,27 +51,60 @@ typedef mdds::sorted_string_map<v> map_type;
 // Keys must be sorted.
 const std::vector<map_type::entry> entries =
 {
-    { ORCUS_ASCII("&"), op_concat },
-    { ORCUS_ASCII("("), op_open },
-    { ORCUS_ASCII(")"), op_close },
-    { ORCUS_ASCII("*"), op_multiply },
-    { ORCUS_ASCII("+"), op_plus },
-    { ORCUS_ASCII(","), op_sep },
-    { ORCUS_ASCII("-"), op_minus },
-    { ORCUS_ASCII("/"), op_divide },
-    { ORCUS_ASCII("<"), op_less },
-    { ORCUS_ASCII("<="), op_less_equal },
-    { ORCUS_ASCII("<>"), op_not_equal },
-    { ORCUS_ASCII("="), op_equal },
-    { ORCUS_ASCII(">"), op_greater },
-    { ORCUS_ASCII(">="), op_greater_equal },
-    { ORCUS_ASCII("^"), op_exponent },
+    { ORCUS_ASCII("&"),  op_concat        }, // 0
+    { ORCUS_ASCII("("),  op_open          }, // 1
+    { ORCUS_ASCII(")"),  op_close         }, // 2
+    { ORCUS_ASCII("*"),  op_multiply      }, // 3
+    { ORCUS_ASCII("+"),  op_plus          }, // 4
+    { ORCUS_ASCII(","),  op_sep           }, // 5
+    { ORCUS_ASCII("-"),  op_minus         }, // 6
+    { ORCUS_ASCII("/"),  op_divide        }, // 7
+    { ORCUS_ASCII("<"),  op_less          }, // 8
+    { ORCUS_ASCII("<="), op_less_equal    }, // 9
+    { ORCUS_ASCII("<>"), op_not_equal     }, // 10
+    { ORCUS_ASCII("="),  op_equal         }, // 11
+    { ORCUS_ASCII(">"),  op_greater       }, // 12
+    { ORCUS_ASCII(">="), op_greater_equal }, // 13
+    { ORCUS_ASCII("^"),  op_exponent      }, // 14
+};
+
+// value-to-string map
+const std::vector<int8_t> v2s_map = {
+    -1, // op_unknown
+    4,  // op_plus
+    6,  // op_minus
+    7,  // op_divide
+    3,  // op_multiply
+    14, // op_exponent
+    0,  // op_concat
+    11, // op_equal
+    10, // op_not_equal
+    8,  // op_less
+    12, // op_greater
+    9,  // op_less_equal
+    13, // op_greater_equal
+    1,  // op_open
+    2,  // op_close
+    5,  // op_sep
 };
 
 const map_type& get()
 {
     static map_type mt(entries.data(), entries.size(), op_unknown);
     return mt;
+}
+
+orcus::pstring str(op_type::v v)
+{
+    if (v >= v2s_map.size())
+        throw std::logic_error("op type value too large!");
+
+    int8_t pos = v2s_map[v];
+    if (pos < 0)
+        return orcus::pstring();
+
+    const map_type::entry& e = entries[pos];
+    return orcus::pstring(e.key, e.keylen);
 }
 
 } // namespace op_type
@@ -172,6 +205,59 @@ class xml_handler : public orcus::sax_token_handler
     const bool m_verbose;
     bool m_valid_formula = false;
 
+    static std::vector<std::string> decode_tokens(const std::vector<uint16_t>& tokens)
+    {
+        std::vector<std::string> decoded;
+        decoded.reserve(tokens.size());
+
+        for (const uint16_t v : tokens)
+        {
+            // extract the token type value.
+            uint16_t ttv = (v & 0x0007) + 1;
+            token_type::v tt = static_cast<token_type::v>(ttv);
+
+            switch (tt)
+            {
+                case token_type::t_error:
+                    decoded.push_back("<error>");
+                    break;
+                case token_type::t_function:
+                {
+                    // Extract the function token value.
+                    uint16_t ftv = v & 0xFFF8;
+                    ftv = (ftv >> 3) + 1;
+                    auto fft = static_cast<ixion::formula_function_t>(ftv);
+                    std::ostringstream os;
+                    os << "<func:" << ixion::get_formula_function_name(fft) << ">";
+                    decoded.push_back(os.str());
+                    break;
+                }
+                case token_type::t_name:
+                    decoded.push_back("<name>");
+                    break;
+                case token_type::t_operator:
+                {
+                    // Extract the operator token value.
+                    uint16_t otv = v & 0xFFF8;
+                    otv = (otv >> 3) + 1;
+                    auto ot = static_cast<op_type::v>(otv);
+                    decoded.push_back(op_type::str(ot).str());
+                    break;
+                }
+                case token_type::t_reference:
+                    decoded.push_back("<ref>");
+                    break;
+                case token_type::t_value:
+                    decoded.push_back("<value>");
+                    break;
+                default:
+                    throw std::logic_error("wrong token type!");
+            }
+        }
+
+        return decoded;
+    }
+
     static void check_parent(const xml_name_t& parent, const orcus::xml_token_t expected)
     {
         if (parent != xml_name_t(orcus::XMLNS_UNKNOWN_ID, expected))
@@ -186,23 +272,33 @@ class xml_handler : public orcus::sax_token_handler
 
     static uint16_t encode_operator(const op_type::v ot)
     {
-        if (ot > 15u)
-            throw std::runtime_error("operator type value too large!");
+        // 3 bits (0-7) for token type (1-6)
+        // 4 bits (0-15) for operator type (1-15)
 
-        uint16_t encoded = ot << 3;
-        encoded += token_type::t_operator;
+        uint16_t ot_v = ot;
+
+        if (!ot_v || ot_v > 15u)
+            throw std::runtime_error("operator type value is out-of-range!");
+
+        // subtract it by one and shift 3 bits.
+        uint16_t encoded = --ot_v << 3;
+        encoded += token_type::t_operator - 1; // subtract it by one
         return encoded;
     }
 
     static uint16_t encode_function(const ixion::formula_function_t fft)
     {
+        // 3 bits (0-7) for token type (1-6)
+        // 9 bits (0-511) for function type (1-323)
+
         uint16_t fft_v = uint16_t(fft);
 
-        if (fft_v > 511u)
-            throw std::runtime_error("function type value too large!");
+        if (!fft_v || fft_v > 511u)
+            throw std::runtime_error("function type value is out-of-range!");
 
-        uint16_t encoded = fft_v << 3;
-        encoded += token_type::t_function;
+        // subtract it by one and shift 3 bits.
+        uint16_t encoded = --fft_v << 3;
+        encoded += token_type::t_function - 1; // subtract it by one
         return encoded;
     }
 
@@ -238,11 +334,19 @@ class xml_handler : public orcus::sax_token_handler
 
     void end_formula()
     {
+        if (!m_valid_formula)
+            return;
+
         if (m_verbose)
             cout << "    * formula tokens: " << m_formula_tokens.size() << endl;
 
         // Write the tokens to the output file.
         std::copy(m_formula_tokens.begin(), m_formula_tokens.end(), std::ostream_iterator<uint16_t>(m_of, ","));
+        m_of << endl;
+
+        // Decode encoded tokens and write it to the output file too.
+        auto decoded = decode_tokens(m_formula_tokens);
+        std::copy(decoded.begin(), decoded.end(), std::ostream_iterator<std::string>(m_of, " "));
         m_of << endl;
     }
 
@@ -275,7 +379,7 @@ class xml_handler : public orcus::sax_token_handler
         if (m_verbose)
             cout << "    * token: '" << s << "'; type: " << type << " (" << tt << ")";
 
-        uint16_t encoded = tt;
+        uint16_t encoded = tt - 1;
 
         switch (tt)
         {
