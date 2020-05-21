@@ -407,6 +407,16 @@ class xml_handler : public orcus::sax_token_handler
                     cout << ", func-id: " << int(fft) << " (" << ixion::get_formula_function_name(fft) << ")";
                 break;
             }
+            case token_type::t_name:
+            {
+                // TODO : make sure the name actually exists in the document.
+                break;
+            }
+            case token_type::t_error:
+            {
+                // TODO : decide what to do this error tokens.
+                break;
+            }
         }
 
         m_formula_tokens.push_back(encoded);
