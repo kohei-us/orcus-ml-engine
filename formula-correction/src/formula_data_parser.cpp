@@ -414,15 +414,25 @@ class xml_handler : public orcus::sax_token_handler
             }
             case token_type::t_error:
             {
-                // TODO : decide what to do this error tokens.
+                // Don't process formula containing error tokens.
+                if (m_verbose)
+                    cout << ", (skip this formula)";
+
+                m_valid_formula = false;
                 break;
             }
         }
 
-        m_formula_tokens.push_back(encoded);
+        if (m_valid_formula)
+        {
+            m_formula_tokens.push_back(encoded);
+
+            if (m_verbose)
+                cout << ", encoded: " << encoded;
+        }
 
         if (m_verbose)
-            cout << ", encoded: " << encoded << endl;
+            cout << endl;
     }
 
 public:
