@@ -57,9 +57,15 @@ def process_document_direct_xml(filepath, doc):
         for token in iter:
             f.write(f'<token s="{escape_str(str(token))}" type="{to_string(token.type)}"/>')
 
-    def write_named_exps(iter, f, scope):
+    def write_global_named_exps(iter, f):
         for name, exp in iter:
-            f.write(f'<named-expression name="{escape_str(name)}" origin="{escape_str(exp.origin)}" formula="{escape_str(exp.formula)}" scope="{scope}">')
+            f.write(f'<named-expression name="{escape_str(name)}" origin="{escape_str(exp.origin)}" formula="{escape_str(exp.formula)}" scope="global">')
+            write_tokens(exp.get_formula_tokens(), f)
+            f.write("</named-expression>")
+
+    def write_sheet_named_exps(iter, f, sheet_name):
+        for name, exp in iter:
+            f.write(f'<named-expression name="{escape_str(name)}" origin="{escape_str(exp.origin)}" formula="{escape_str(exp.formula)}" scope="sheet" sheet-name="{sheet_name}">')
             write_tokens(exp.get_formula_tokens(), f)
             f.write("</named-expression>")
 
@@ -72,9 +78,9 @@ def process_document_direct_xml(filepath, doc):
         f.write("</sheets>")
         f.write("<named-expressions>")
 
-        write_named_exps(doc.get_named_expressions(), f, "global")
+        write_global_named_exps(doc.get_named_expressions(), f)
         for sheet in doc.sheets:
-            write_named_exps(sheet.get_named_expressions(), f, "sheet")
+            write_sheet_named_exps(sheet.get_named_expressions(), f, sheet.name)
 
         f.write("</named-expressions>")
 
