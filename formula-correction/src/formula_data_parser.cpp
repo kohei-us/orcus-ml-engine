@@ -18,6 +18,7 @@
 #include <iostream>
 #include <vector>
 #include <unordered_set>
+#include <unordered_map>
 #include <fstream>
 
 namespace po = boost::program_options;
@@ -198,15 +199,19 @@ class xml_handler : public orcus::sax_token_handler
     using token_set_t = std::unordered_set<orcus::xml_token_t>;
     using xml_name_t = std::pair<orcus::xmlns_id_t, orcus::xml_token_t>;
     using name_set_t = std::unordered_set<orcus::pstring, orcus::pstring::hash>;
+    using named_name_set_t = std::unordered_map<orcus::pstring, name_set_t, orcus::pstring::hash>;
 
     std::ofstream& m_of;
 
     std::vector<xml_name_t> m_stack;
     std::vector<uint16_t> m_formula_tokens;
-    name_set_t m_global_named_exps_names;
+    name_set_t m_global_named_exps;
+    named_name_set_t m_sheet_named_exps;
     name_set_t m_sheet_names;
 
     orcus::string_pool m_str_pool;
+
+    orcus::pstring m_cur_formula_sheet;
 
     const bool m_verbose;
     bool m_valid_formula = false;
@@ -308,6 +313,20 @@ class xml_handler : public orcus::sax_token_handler
         return encoded;
     }
 
+    bool name_exists(const orcus::pstring& name, const orcus::pstring& sheet)
+    {
+        if (m_global_named_exps.count(name))
+            // this is a global name.
+            return true;
+
+        auto it = m_sheet_named_exps.find(sheet);
+        if (it == m_sheet_named_exps.end())
+            return false;
+
+        const name_set_t& sheet_names = it->second;
+        return sheet_names.count(name);
+    }
+
     void start_sheet(const xml_name_t parent, const orcus::xml_token_element_t& elem)
     {
         check_parent(parent, XML_sheets);
@@ -328,7 +347,7 @@ class xml_handler : public orcus::sax_token_handler
     {
         check_parent(parent, XML_named_expressions);
 
-        orcus::pstring name, scope;
+        orcus::pstring name, scope, sheet;
         m_valid_formula = false;
 
         for (const auto& attr : elem.attrs)
@@ -341,23 +360,47 @@ class xml_handler : public orcus::sax_token_handler
                 case XML_scope:
                     scope = attr.value;
                     break;
+                case XML_sheet:
+                    sheet = attr.value;
+                    break;
             }
         }
 
         if (m_verbose)
-            cout << "  * named expression: " << name << "  (scope: " << scope << ")" << endl;
+            cout << "  * named expression: name: '" << name << "', scope: " << scope;
 
         if (scope == "global")
-            m_global_named_exps_names.insert(m_str_pool.intern(name).first);
+            m_global_named_exps.insert(m_str_pool.intern(name).first);
         else
-            throw std::runtime_error("TODO: implement non-global named-expression!");
+        {
+            // sheet-local named expression
+            if (m_verbose)
+                cout << ", sheet='" << sheet << "'";
+
+            if (!m_sheet_names.count(sheet))
+            {
+                std::ostringstream os;
+                os << "sheet name '" << sheet << "' does not exist in this document.";
+                throw std::runtime_error(os.str());
+            }
+
+            auto it = m_sheet_named_exps.find(sheet);
+            if (it == m_sheet_named_exps.end())
+                it = m_sheet_named_exps.insert({sheet, name_set_t()}).first;
+
+            name_set_t& names = it->second;
+            names.insert(m_str_pool.intern(name).first);
+        }
+
+        if (m_verbose)
+            cout << endl;
     }
 
     void start_formula(const xml_name_t parent, const orcus::xml_token_element_t& elem)
     {
         check_parent(parent, XML_formulas);
 
-        orcus::pstring formula;
+        orcus::pstring formula, sheet;
 
         for (const auto& attr : elem.attrs)
         {
@@ -365,6 +408,9 @@ class xml_handler : public orcus::sax_token_handler
             {
                 case XML_formula:
                     formula = attr.value;
+                    break;
+                case XML_sheet:
+                    sheet = attr.value;
                     break;
                 case XML_valid:
                     m_valid_formula = attr.value == "true";
@@ -376,6 +422,7 @@ class xml_handler : public orcus::sax_token_handler
             return;
 
         m_formula_tokens.clear();
+        m_cur_formula_sheet = m_str_pool.intern(sheet).first;
 
         if (m_verbose)
             cout << "  * formula: " << formula << endl;
@@ -428,7 +475,7 @@ class xml_handler : public orcus::sax_token_handler
             throw std::runtime_error("unknown token type!");
 
         if (m_verbose)
-            cout << "    * token: '" << s << "'; type: " << type << " (" << tt << ")";
+            cout << "    * token: '" << s << "', type: " << type << " (" << tt << ")";
 
         uint16_t encoded = tt - 1;
 
@@ -460,8 +507,8 @@ class xml_handler : public orcus::sax_token_handler
             }
             case token_type::t_name:
             {
-                // TODO : make sure the name actually exists in the document.
-                if (!m_global_named_exps_names.count(s))
+                // Make sure the name actually exists in the document.
+                if (!name_exists(s, m_cur_formula_sheet))
                 {
                     if (m_verbose)
                         cout << ", (name not found)";
