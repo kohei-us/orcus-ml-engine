@@ -64,7 +64,7 @@ def process_document_direct_xml(filepath, doc):
 
     def write_sheet_named_exps(iter, f, sheet_name):
         for name, exp in iter:
-            f.write(f'<named-expression name="{escape_str(name)}" origin="{escape_str(exp.origin)}" formula="{escape_str(exp.formula)}" scope="sheet" sheet-name="{sheet_name}">')
+            f.write(f'<named-expression name="{escape_str(name)}" origin="{escape_str(exp.origin)}" formula="{escape_str(exp.formula)}" scope="sheet" sheet="{sheet_name}">')
             write_tokens(exp.get_formula_tokens(), f)
             f.write("</named-expression>")
 
