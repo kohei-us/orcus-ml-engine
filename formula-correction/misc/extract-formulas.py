@@ -11,7 +11,6 @@ import os
 import os.path
 import sys
 import enum
-import shutil
 
 import orcus
 from orcus.tools.file_processor import config
@@ -216,7 +215,7 @@ def main():
 
             inpath = os.path.join(root, filename)
             outpath = os.path.join(args.output, f"{i+1:04}.xml")
-            shutil.copyfile(inpath, outpath)
+            os.link(inpath, outpath)
             i += 1
 
 
