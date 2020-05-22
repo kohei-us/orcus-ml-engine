@@ -197,13 +197,14 @@ class xml_handler : public orcus::sax_token_handler
 
     using token_set_t = std::unordered_set<orcus::xml_token_t>;
     using xml_name_t = std::pair<orcus::xmlns_id_t, orcus::xml_token_t>;
-    using named_exp_names_t = std::unordered_set<orcus::pstring, orcus::pstring::hash>;
+    using name_set_t = std::unordered_set<orcus::pstring, orcus::pstring::hash>;
 
     std::ofstream& m_of;
 
     std::vector<xml_name_t> m_stack;
     std::vector<uint16_t> m_formula_tokens;
-    named_exp_names_t m_global_names;
+    name_set_t m_global_named_exps_names;
+    name_set_t m_sheet_names;
 
     orcus::string_pool m_str_pool;
 
@@ -307,6 +308,22 @@ class xml_handler : public orcus::sax_token_handler
         return encoded;
     }
 
+    void start_sheet(const xml_name_t parent, const orcus::xml_token_element_t& elem)
+    {
+        check_parent(parent, XML_sheets);
+
+        for (const auto& attr : elem.attrs)
+        {
+            if (attr.name == XML_name)
+            {
+                m_sheet_names.insert(m_str_pool.intern(attr.value).first);
+
+                if (m_verbose)
+                    cout << "  * sheet: " << attr.value << endl;
+            }
+        }
+    }
+
     void start_named_expression(const xml_name_t parent, const orcus::xml_token_element_t& elem)
     {
         check_parent(parent, XML_named_expressions);
@@ -331,7 +348,7 @@ class xml_handler : public orcus::sax_token_handler
             cout << "  * named expression: " << name << "  (scope: " << scope << ")" << endl;
 
         if (scope == "global")
-            m_global_names.insert(m_str_pool.intern(name).first);
+            m_global_named_exps_names.insert(m_str_pool.intern(name).first);
         else
             throw std::runtime_error("TODO: implement non-global named-expression!");
     }
@@ -444,7 +461,7 @@ class xml_handler : public orcus::sax_token_handler
             case token_type::t_name:
             {
                 // TODO : make sure the name actually exists in the document.
-                if (!m_global_names.count(s))
+                if (!m_global_named_exps_names.count(s))
                 {
                     if (m_verbose)
                         cout << ", (name not found)";
@@ -506,16 +523,7 @@ public:
             }
             case XML_sheet:
             {
-                check_parent(parent, XML_sheets);
-
-                for (const auto& attr : elem.attrs)
-                {
-                    if (attr.name == XML_name)
-                    {
-                        if (m_verbose)
-                            cout << "  * sheet: " << attr.value << endl;
-                    }
-                }
+                start_sheet(parent, elem);
                 break;
             }
             case XML_named_expressions:
