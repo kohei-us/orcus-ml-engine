@@ -10,6 +10,7 @@
 #include <orcus/types.hpp>
 #include <orcus/tokens.hpp>
 #include <orcus/xml_namespace.hpp>
+#include <orcus/string_pool.hpp>
 #include <mdds/sorted_string_map.hpp>
 #include <ixion/formula_function_opcode.hpp>
 #include <boost/program_options.hpp>
@@ -196,11 +197,15 @@ class xml_handler : public orcus::sax_token_handler
 
     using token_set_t = std::unordered_set<orcus::xml_token_t>;
     using xml_name_t = std::pair<orcus::xmlns_id_t, orcus::xml_token_t>;
+    using named_exp_names_t = std::unordered_set<orcus::pstring, orcus::pstring::hash>;
 
     std::ofstream& m_of;
 
     std::vector<xml_name_t> m_stack;
     std::vector<uint16_t> m_formula_tokens;
+    named_exp_names_t m_global_names;
+
+    orcus::string_pool m_str_pool;
 
     const bool m_verbose;
     bool m_valid_formula = false;
@@ -300,6 +305,35 @@ class xml_handler : public orcus::sax_token_handler
         uint16_t encoded = --fft_v << 3;
         encoded += token_type::t_function - 1; // subtract it by one
         return encoded;
+    }
+
+    void start_named_expression(const xml_name_t parent, const orcus::xml_token_element_t& elem)
+    {
+        check_parent(parent, XML_named_expressions);
+
+        orcus::pstring name, scope;
+        m_valid_formula = false;
+
+        for (const auto& attr : elem.attrs)
+        {
+            switch (attr.name)
+            {
+                case XML_name:
+                    name = attr.value;
+                    break;
+                case XML_scope:
+                    scope = attr.value;
+                    break;
+            }
+        }
+
+        if (m_verbose)
+            cout << "  * named expression: " << name << "  (scope: " << scope << ")" << endl;
+
+        if (scope == "global")
+            m_global_names.insert(m_str_pool.intern(name).first);
+        else
+            throw std::runtime_error("TODO: implement non-global named-expression!");
     }
 
     void start_formula(const xml_name_t parent, const orcus::xml_token_element_t& elem)
@@ -410,6 +444,13 @@ class xml_handler : public orcus::sax_token_handler
             case token_type::t_name:
             {
                 // TODO : make sure the name actually exists in the document.
+                if (!m_global_names.count(s))
+                {
+                    if (m_verbose)
+                        cout << ", (name not found)";
+
+                    m_valid_formula = false;
+                }
                 break;
             }
             case token_type::t_error:
@@ -484,26 +525,7 @@ public:
             }
             case XML_named_expression:
             {
-                check_parent(parent, XML_named_expressions);
-
-                orcus::pstring name, scope;
-                m_valid_formula = false;
-
-                for (const auto& attr : elem.attrs)
-                {
-                    switch (attr.name)
-                    {
-                        case XML_name:
-                            name = attr.value;
-                            break;
-                        case XML_scope:
-                            scope = attr.value;
-                            break;
-                    }
-                }
-
-                if (m_verbose)
-                    cout << "  * named expression: " << name << "  (scope: " << scope << ")" << endl;
+                start_named_expression(parent, elem);
                 break;
             }
             case XML_formulas:
