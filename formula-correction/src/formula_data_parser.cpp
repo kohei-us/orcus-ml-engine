@@ -20,11 +20,13 @@
 #include <unordered_set>
 #include <unordered_map>
 #include <fstream>
+#include <map>
 
 namespace po = boost::program_options;
 using std::cout;
 using std::cerr;
 using std::endl;
+using orcus::pstring;
 
 namespace op_type {
 
@@ -96,17 +98,17 @@ const map_type& get()
     return mt;
 }
 
-orcus::pstring str(op_type::v v)
+pstring str(op_type::v v)
 {
     if (v >= v2s_map.size())
         throw std::logic_error("op type value too large!");
 
     int8_t pos = v2s_map[v];
     if (pos < 0)
-        return orcus::pstring();
+        return pstring();
 
     const map_type::entry& e = entries[pos];
-    return orcus::pstring(e.key, e.keylen);
+    return pstring(e.key, e.keylen);
 }
 
 } // namespace op_type
@@ -198,8 +200,9 @@ class xml_handler : public orcus::sax_token_handler
 
     using token_set_t = std::unordered_set<orcus::xml_token_t>;
     using xml_name_t = std::pair<orcus::xmlns_id_t, orcus::xml_token_t>;
-    using name_set_t = std::unordered_set<orcus::pstring, orcus::pstring::hash>;
-    using named_name_set_t = std::unordered_map<orcus::pstring, name_set_t, orcus::pstring::hash>;
+    using name_set_t = std::unordered_set<pstring, pstring::hash>;
+    using named_name_set_t = std::unordered_map<pstring, name_set_t, pstring::hash>;
+    using str_counter_t = std::map<pstring, uint32_t>;
 
     std::ofstream& m_of;
 
@@ -211,7 +214,10 @@ class xml_handler : public orcus::sax_token_handler
 
     orcus::string_pool m_str_pool;
 
-    orcus::pstring m_cur_formula_sheet;
+    pstring m_filepath;
+    pstring m_cur_formula_sheet;
+
+    str_counter_t m_invalid_name_counts;
 
     const bool m_verbose;
     bool m_valid_formula = false;
@@ -313,7 +319,16 @@ class xml_handler : public orcus::sax_token_handler
         return encoded;
     }
 
-    bool name_exists(const orcus::pstring& name, const orcus::pstring& sheet)
+    void count_invalid_name(const pstring& name)
+    {
+        auto it = m_invalid_name_counts.find(name);
+        if (it == m_invalid_name_counts.end())
+            m_invalid_name_counts.insert({name, 1u});
+        else
+            ++it->second;
+    }
+
+    bool name_exists(const pstring& name, const pstring& sheet)
     {
         if (m_global_named_exps.count(name))
             // this is a global name.
@@ -325,6 +340,29 @@ class xml_handler : public orcus::sax_token_handler
 
         const name_set_t& sheet_names = it->second;
         return sheet_names.count(name);
+    }
+
+    void start_doc(const xml_name_t parent, const orcus::xml_token_element_t& elem)
+    {
+        check_parent(parent, orcus::XML_UNKNOWN_TOKEN);
+
+        for (const auto& attr : elem.attrs)
+        {
+            if (attr.name == XML_filepath)
+                m_filepath = attr.transient ? m_str_pool.intern(attr.value).first : attr.value;
+        }
+    }
+
+    void end_doc()
+    {
+        if (!m_invalid_name_counts.empty())
+        {
+            cout << endl;
+            cout << "  document path: " << m_filepath << endl;
+            cout << "  invalid names:" << endl;
+            for (const auto& entry : m_invalid_name_counts)
+                cout << "    - " << entry.first << ": " << entry.second << endl;
+        }
     }
 
     void start_sheet(const xml_name_t parent, const orcus::xml_token_element_t& elem)
@@ -347,7 +385,7 @@ class xml_handler : public orcus::sax_token_handler
     {
         check_parent(parent, XML_named_expressions);
 
-        orcus::pstring name, scope, sheet;
+        pstring name, scope, sheet;
         m_valid_formula = false;
 
         for (const auto& attr : elem.attrs)
@@ -400,7 +438,7 @@ class xml_handler : public orcus::sax_token_handler
     {
         check_parent(parent, XML_formulas);
 
-        orcus::pstring formula, sheet;
+        pstring formula, sheet;
 
         for (const auto& attr : elem.attrs)
         {
@@ -419,7 +457,10 @@ class xml_handler : public orcus::sax_token_handler
         }
 
         if (!m_valid_formula)
+        {
+            cerr << "invalid formula: " << formula << endl;
             return;
+        }
 
         m_formula_tokens.clear();
         m_cur_formula_sheet = m_str_pool.intern(sheet).first;
@@ -455,7 +496,7 @@ class xml_handler : public orcus::sax_token_handler
         if (!m_valid_formula)
             return;
 
-        orcus::pstring s, type;
+        pstring s, type;
 
         for (const auto& attr : elem.attrs)
         {
@@ -514,6 +555,7 @@ class xml_handler : public orcus::sax_token_handler
                         cout << ", (name not found)";
 
                     m_valid_formula = false;
+                    count_invalid_name(s);
                 }
                 break;
             }
@@ -524,6 +566,7 @@ class xml_handler : public orcus::sax_token_handler
                     cout << ", (skip this formula)";
 
                 m_valid_formula = false;
+                cerr << "error token" << endl;
                 break;
             }
         }
@@ -560,7 +603,7 @@ public:
         {
             case XML_doc:
             {
-                check_parent(parent, orcus::XML_UNKNOWN_TOKEN);
+                start_doc(parent, elem);
                 break;
             }
             case XML_sheets:
@@ -612,6 +655,11 @@ public:
                     end_formula();
                     break;
                 }
+                case XML_doc:
+                {
+                    end_doc();
+                    break;
+                }
             }
         }
 
@@ -632,9 +680,11 @@ public:
 
     void parse_file(const std::string& filepath)
     {
-        cout << "--" << endl;
         orcus::file_content content(filepath.data());
+        cout << "--" << endl;
         cout << "filepath: " << filepath << " (size: " << content.size() << ")" << endl;
+        m_of << "--" << endl;
+        m_of << "filepath: " << filepath << endl;
 
         orcus::xmlns_repository repo;
         auto cxt = repo.create_context();
