@@ -217,6 +217,7 @@ class xml_handler : public orcus::sax_token_handler
     pstring m_filepath;
     pstring m_cur_formula_sheet;
 
+    str_counter_t m_invalid_formula_counts;
     str_counter_t m_invalid_name_counts;
 
     const bool m_verbose;
@@ -319,11 +320,11 @@ class xml_handler : public orcus::sax_token_handler
         return encoded;
     }
 
-    void count_invalid_name(const pstring& name)
+    static void increment_name_count(str_counter_t& counter, const pstring& name)
     {
-        auto it = m_invalid_name_counts.find(name);
-        if (it == m_invalid_name_counts.end())
-            m_invalid_name_counts.insert({name, 1u});
+        auto it = counter.find(name);
+        if (it == counter.end())
+            counter.insert({name, 1u});
         else
             ++it->second;
     }
@@ -355,10 +356,25 @@ class xml_handler : public orcus::sax_token_handler
 
     void end_doc()
     {
+        bool print_report = !m_invalid_name_counts.empty() || !m_invalid_formula_counts.empty();
+
+        if (!print_report)
+            return;
+
+        cout << endl;
+        cout << "  document path: " << m_filepath << endl;
+
+        if (!m_invalid_formula_counts.empty())
+        {
+            cout << endl;
+            cout << "  invalid formulas:" << endl;
+            for (const auto& entry : m_invalid_formula_counts)
+                cout << "    - " << entry.first << ": " << entry.second << endl;
+        }
+
         if (!m_invalid_name_counts.empty())
         {
             cout << endl;
-            cout << "  document path: " << m_filepath << endl;
             cout << "  invalid names:" << endl;
             for (const auto& entry : m_invalid_name_counts)
                 cout << "    - " << entry.first << ": " << entry.second << endl;
@@ -458,7 +474,7 @@ class xml_handler : public orcus::sax_token_handler
 
         if (!m_valid_formula)
         {
-            cerr << "invalid formula: " << formula << endl;
+            increment_name_count(m_invalid_formula_counts, formula);
             return;
         }
 
@@ -555,7 +571,7 @@ class xml_handler : public orcus::sax_token_handler
                         cout << ", (name not found)";
 
                     m_valid_formula = false;
-                    count_invalid_name(s);
+                    increment_name_count(m_invalid_name_counts, s);
                 }
                 break;
             }
