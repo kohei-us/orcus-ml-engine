@@ -707,7 +707,15 @@ public:
         xml_handler hdl(m_of, m_verbose);
         orcus::tokens token_map(token_labels, ORCUS_N_ELEMENTS(token_labels));
         orcus::sax_token_parser<xml_handler> parser(content.data(), content.size(), token_map, cxt, hdl);
-        parser.parse();
+        try
+        {
+            parser.parse();
+        }
+        catch (const std::exception& e)
+        {
+            cout << endl;
+            cout << "  XML parse error: " << e.what() << endl;
+        }
     }
 };
 
