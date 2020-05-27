@@ -14,6 +14,7 @@
 #include <mdds/sorted_string_map.hpp>
 #include <ixion/formula_function_opcode.hpp>
 #include <boost/program_options.hpp>
+#include <boost/filesystem.hpp>
 
 #include <iostream>
 #include <vector>
@@ -23,6 +24,7 @@
 #include <map>
 
 namespace po = boost::program_options;
+namespace fs = boost::filesystem;
 using std::cout;
 using std::cerr;
 using std::endl;
@@ -194,6 +196,11 @@ constexpr orcus::xml_token_t XML_valid              = 19;
 
 class xml_handler : public orcus::sax_token_handler
 {
+    struct null_buffer : public std::streambuf
+    {
+        int overflow(int c) { return c; }
+    };
+
     // 3 bits (0-7) for token type (1-6),
     // 4 bits (0-15) for operator type (1-15),
     // 9 bits (0-511) for function type (1-323).
@@ -204,7 +211,8 @@ class xml_handler : public orcus::sax_token_handler
     using named_name_set_t = std::unordered_map<pstring, name_set_t, pstring::hash>;
     using str_counter_t = std::map<pstring, uint32_t>;
 
-    std::ofstream& m_of;
+    null_buffer m_null_buf;
+    std::ostream m_of;
 
     std::vector<xml_name_t> m_stack;
     std::vector<uint16_t> m_formula_tokens;
@@ -601,7 +609,7 @@ class xml_handler : public orcus::sax_token_handler
 
 public:
 
-    xml_handler(std::ofstream& of, bool verbose) : m_of(of), m_verbose(verbose) {}
+    xml_handler(bool verbose) : m_null_buf(), m_of(&m_null_buf), m_verbose(verbose) {}
 
     void start_element(const orcus::xml_token_element_t& elem)
     {
@@ -685,12 +693,12 @@ public:
 
 class processor
 {
-    std::ofstream m_of;
+    fs::path m_outdir;
     const bool m_verbose;
 
 public:
-    processor(const std::string& output_path, bool verbose) :
-        m_of(output_path.data()), m_verbose(verbose) {}
+    processor(const fs::path& outdir, bool verbose) :
+        m_outdir(outdir), m_verbose(verbose) {}
 
     processor(const processor&) = delete;
 
@@ -699,12 +707,10 @@ public:
         orcus::file_content content(filepath.data());
         cout << "--" << endl;
         cout << "filepath: " << filepath << " (size: " << content.size() << ")" << endl;
-        m_of << "--" << endl;
-        m_of << "filepath: " << filepath << endl;
 
         orcus::xmlns_repository repo;
         auto cxt = repo.create_context();
-        xml_handler hdl(m_of, m_verbose);
+        xml_handler hdl(m_verbose);
         orcus::tokens token_map(token_labels, ORCUS_N_ELEMENTS(token_labels));
         orcus::sax_token_parser<xml_handler> parser(content.data(), content.size(), token_map, cxt, hdl);
         try
@@ -719,7 +725,6 @@ public:
     }
 };
 
-
 int main(int argc, char** argv)
 {
     bool verbose = false;
@@ -728,7 +733,7 @@ int main(int argc, char** argv)
     desc.add_options()
         ("help,h", "Print this help.")
         ("verbose,v", po::bool_switch(&verbose), "Verbose output.")
-        ("output,o", po::value<std::string>(), "Output file path.");
+        ("output,o", po::value<std::string>(), "Output directory.");
 
     po::options_description hidden("Hidden options");
     hidden.add_options()
@@ -763,7 +768,7 @@ int main(int argc, char** argv)
 
     if (!vm.count("output"))
     {
-        cerr << "output file path is required." << endl;
+        cerr << "output directory path is required." << endl;
         return EXIT_FAILURE;
     }
 
@@ -771,8 +776,19 @@ int main(int argc, char** argv)
         return EXIT_SUCCESS;
 
     std::vector<std::string> input_files = vm["input-files"].as<std::vector<std::string>>();
+    fs::path outdir(vm["output"].as<std::string>());
 
-    processor p(vm["output"].as<std::string>(), verbose);
+    try
+    {
+        fs::create_directory(outdir);
+    }
+    catch (const fs::filesystem_error& e)
+    {
+        cerr << e.what() << endl;
+        return EXIT_FAILURE;
+    }
+
+    processor p(outdir, verbose);
 
     for (const std::string& filepath : input_files)
         p.parse_file(filepath);
