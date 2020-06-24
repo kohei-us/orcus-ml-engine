@@ -23,6 +23,8 @@
 #include <fstream>
 #include <map>
 
+#include "trie_builder.hpp"
+
 namespace po = boost::program_options;
 namespace fs = boost::filesystem;
 using std::cout;
@@ -228,6 +230,7 @@ class xml_handler : public orcus::sax_token_handler
     str_counter_t m_invalid_formula_counts;
     str_counter_t m_invalid_name_counts;
 
+    trie_builder& m_trie;
     const bool m_verbose;
     bool m_valid_formula = false;
 
@@ -503,6 +506,9 @@ class xml_handler : public orcus::sax_token_handler
         if (m_verbose)
             cout << "    * formula tokens: " << m_formula_tokens.size() << endl;
 
+        m_trie.insert_formula(m_formula_tokens);
+
+#if 0
         // Write the tokens to the output file.
         std::copy(m_formula_tokens.begin(), m_formula_tokens.end(), std::ostream_iterator<uint16_t>(m_of, ","));
         m_of << endl;
@@ -511,6 +517,7 @@ class xml_handler : public orcus::sax_token_handler
         auto decoded = decode_tokens(m_formula_tokens);
         std::copy(decoded.begin(), decoded.end(), std::ostream_iterator<std::string>(m_of, " "));
         m_of << endl;
+#endif
     }
 
     void start_token(const xml_name_t parent, const orcus::xml_token_element_t& elem)
@@ -609,7 +616,11 @@ class xml_handler : public orcus::sax_token_handler
 
 public:
 
-    xml_handler(bool verbose) : m_null_buf(), m_of(&m_null_buf), m_verbose(verbose) {}
+    xml_handler(trie_builder& trie, bool verbose) :
+        m_null_buf(),
+        m_of(&m_null_buf),
+        m_trie(trie),
+        m_verbose(verbose) {}
 
     void start_element(const orcus::xml_token_element_t& elem)
     {
@@ -693,6 +704,7 @@ public:
 
 class processor
 {
+    trie_builder m_trie;
     fs::path m_outdir;
     const bool m_verbose;
 
@@ -710,9 +722,10 @@ public:
 
         orcus::xmlns_repository repo;
         auto cxt = repo.create_context();
-        xml_handler hdl(m_verbose);
+        xml_handler hdl(m_trie, m_verbose);
         orcus::tokens token_map(token_labels, ORCUS_N_ELEMENTS(token_labels));
         orcus::sax_token_parser<xml_handler> parser(content.data(), content.size(), token_map, cxt, hdl);
+
         try
         {
             parser.parse();

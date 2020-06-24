@@ -1,5 +1,8 @@
 
-add_executable(formula-data-parser formula_data_parser.cpp)
+add_executable(formula-data-parser
+    formula_data_parser.cpp
+    trie_builder.cpp
+)
 
 add_executable(collect-tokens collect_tokens.cpp)
 
