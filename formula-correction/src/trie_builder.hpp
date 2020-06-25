@@ -11,8 +11,15 @@
 
 class trie_builder
 {
+    using key_trait = mdds::trie::std_container_trait<std::vector<uint16_t>>;
+    using map_type = mdds::trie_map<key_trait, int>;
+
+    map_type m_trie;
+
 public:
     void insert_formula(const std::vector<uint16_t>& tokens);
+
+    void write(std::ostream& os);
 };
 
 

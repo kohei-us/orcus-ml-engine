@@ -8,12 +8,23 @@
 #include "trie_builder.hpp"
 #include <iostream>
 
+using namespace std;
+
 void trie_builder::insert_formula(const std::vector<uint16_t>& tokens)
 {
     if (tokens.empty())
         return;
 
-    // TODO : insert this token set into the trie...
+    auto it = m_trie.find(tokens);
+
+    if (it == m_trie.end())
+        m_trie.insert(tokens, 1);
+}
+
+void trie_builder::write(std::ostream& os)
+{
+    auto packed = m_trie.pack();
+    packed.save_state(os);
 }
 
 /* vim:set shiftwidth=4 softtabstop=4 expandtab: */

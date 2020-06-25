@@ -736,6 +736,13 @@ public:
             cout << "  XML parse error: " << e.what() << endl;
         }
     }
+
+    void write_files()
+    {
+        fs::path p = m_outdir / "formula-tokens.bin";
+        std::ofstream of(p.string());
+        m_trie.write(of);
+    }
 };
 
 int main(int argc, char** argv)
@@ -805,6 +812,8 @@ int main(int argc, char** argv)
 
     for (const std::string& filepath : input_files)
         p.parse_file(filepath);
+
+    p.write_files();
 
     return EXIT_SUCCESS;
 }
