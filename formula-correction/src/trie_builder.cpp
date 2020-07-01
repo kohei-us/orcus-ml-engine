@@ -19,6 +19,8 @@ void trie_builder::insert_formula(const std::vector<uint16_t>& tokens)
 
     if (it == m_trie.end())
         m_trie.insert(tokens, 1);
+    else
+        ++it->second; // increment the counter.
 }
 
 void trie_builder::write(std::ostream& os)
