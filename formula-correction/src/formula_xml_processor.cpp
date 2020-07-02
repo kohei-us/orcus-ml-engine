@@ -24,6 +24,22 @@ using orcus::pstring;
 
 namespace {
 
+class scoped_guard
+{
+    std::thread m_thread;
+public:
+    scoped_guard(std::thread thread) : m_thread(std::move(thread)) {}
+    scoped_guard(scoped_guard&& other) : m_thread(std::move(other.m_thread)) {}
+
+    scoped_guard(const scoped_guard&) = delete;
+    scoped_guard& operator= (const scoped_guard&) = delete;
+
+    ~scoped_guard()
+    {
+        m_thread.join();
+    }
+};
+
 namespace op_type {
 
 enum v : uint8_t
@@ -700,6 +716,13 @@ public:
 
 } // anonymous namespace
 
+void formula_xml_processor::launch_queue_dispatcher_thread(
+    queue_type* queue, const std::vector<std::string>& filepaths)
+{
+    for (const std::string& filepath : filepaths)
+        queue->push(&formula_xml_processor::parse_file, this, filepath);
+}
+
 trie_builder formula_xml_processor::parse_file(const std::string& filepath)
 {
     orcus::file_content content(filepath.data());
@@ -729,13 +752,33 @@ trie_builder formula_xml_processor::parse_file(const std::string& filepath)
 }
 
 formula_xml_processor::formula_xml_processor(const fs::path& outdir, bool verbose) :
-    m_outdir(outdir), m_verbose(verbose) {}
+    m_outdir(outdir), m_verbose(verbose), m_use_threads(true) {}
 
 void formula_xml_processor::parse_files(const std::vector<std::string>& filepaths)
 {
-    for (const std::string& filepath : filepaths)
+    if (!m_use_threads)
     {
-        trie_builder trie = parse_file(filepath);
+        for (const std::string& filepath : filepaths)
+        {
+            trie_builder trie = parse_file(filepath);
+            m_trie.merge(trie);
+
+            cout << "cumulative formula entry count: " << m_trie.size() << endl;
+        }
+
+        return;
+    }
+
+    size_t file_count = filepaths.size();
+
+    queue_type queue(32);
+
+    std::thread t(&formula_xml_processor::launch_queue_dispatcher_thread, this, &queue, filepaths);
+    scoped_guard guard(std::move(t));
+
+    for (size_t i = 0; i < file_count; ++i)
+    {
+        trie_builder trie = queue.get_one();
         m_trie.merge(trie);
 
         cout << "cumulative formula entry count: " << m_trie.size() << endl;

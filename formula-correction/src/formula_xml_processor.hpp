@@ -8,6 +8,7 @@
 #pragma once
 
 #include "trie_builder.hpp"
+#include "async_queue.hpp"
 
 #include <boost/filesystem.hpp>
 #include <string>
@@ -15,13 +16,21 @@
 
 class formula_xml_processor
 {
+public:
+    using queue_type = async_queue<trie_builder>;
+
+private:
     trie_builder m_trie;
     boost::filesystem::path m_outdir;
     const bool m_verbose;
+    const bool m_use_threads;
+
+    void launch_queue_dispatcher_thread(queue_type* queue, const std::vector<std::string>& filepaths);
 
     trie_builder parse_file(const std::string& filepath);
 
 public:
+
     formula_xml_processor(const boost::filesystem::path& outdir, bool verbose);
 
     formula_xml_processor(const formula_xml_processor&) = delete;

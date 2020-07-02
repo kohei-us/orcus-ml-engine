@@ -6,6 +6,7 @@ set(CMAKE_CXX_STANDARD 11)
 
 find_package(Boost REQUIRED COMPONENTS program_options filesystem)
 find_package(PkgConfig REQUIRED)
+find_package(Threads)
 
 pkg_check_modules(LIBMDDS REQUIRED mdds-1.5)
 pkg_check_modules(LIBIXION REQUIRED libixion-0.16)
