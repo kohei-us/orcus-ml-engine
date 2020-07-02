@@ -22,6 +22,8 @@ using std::cerr;
 using std::endl;
 using orcus::pstring;
 
+namespace {
+
 namespace op_type {
 
 enum v : uint8_t
@@ -695,6 +697,8 @@ public:
         return m_trie;
     }
 };
+
+} // anonymous namespace
 
 void formula_xml_processor::parse_file(const std::string& filepath)
 {
