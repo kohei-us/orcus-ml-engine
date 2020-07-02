@@ -712,12 +712,6 @@ class processor
     fs::path m_outdir;
     const bool m_verbose;
 
-public:
-    processor(const fs::path& outdir, bool verbose) :
-        m_outdir(outdir), m_verbose(verbose) {}
-
-    processor(const processor&) = delete;
-
     void parse_file(const std::string& filepath)
     {
         orcus::file_content content(filepath.data());
@@ -745,6 +739,18 @@ public:
 
         cout << endl;
         cout << "cumulative formula entry count: " << m_trie.size() << endl;
+    }
+
+public:
+    processor(const fs::path& outdir, bool verbose) :
+        m_outdir(outdir), m_verbose(verbose) {}
+
+    processor(const processor&) = delete;
+
+    void parse_files(const std::vector<std::string>& filepaths)
+    {
+        for (const std::string& filepath : filepaths)
+            parse_file(filepath);
     }
 
     void write_files()
@@ -819,10 +825,7 @@ int main(int argc, char** argv)
     }
 
     processor p(outdir, verbose);
-
-    for (const std::string& filepath : input_files)
-        p.parse_file(filepath);
-
+    p.parse_files(input_files);
     p.write_files();
 
     return EXIT_SUCCESS;
