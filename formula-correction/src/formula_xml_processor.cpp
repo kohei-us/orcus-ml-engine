@@ -692,15 +692,15 @@ public:
         m_stack.pop_back();
     }
 
-    const trie_builder& get_trie() const
+    void pop_trie(trie_builder& trie)
     {
-        return m_trie;
+        m_trie.swap(trie);
     }
 };
 
 } // anonymous namespace
 
-void formula_xml_processor::parse_file(const std::string& filepath)
+trie_builder formula_xml_processor::parse_file(const std::string& filepath)
 {
     orcus::file_content content(filepath.data());
     cout << "--" << endl;
@@ -720,13 +720,12 @@ void formula_xml_processor::parse_file(const std::string& filepath)
     {
         cout << endl;
         cout << "  XML parse error: " << e.what() << endl;
-        return;
+        return trie_builder();
     }
 
-    m_trie.merge(hdl.get_trie());
-
-    cout << endl;
-    cout << "cumulative formula entry count: " << m_trie.size() << endl;
+    trie_builder trie;
+    hdl.pop_trie(trie);
+    return trie;
 }
 
 formula_xml_processor::formula_xml_processor(const fs::path& outdir, bool verbose) :
@@ -735,7 +734,12 @@ formula_xml_processor::formula_xml_processor(const fs::path& outdir, bool verbos
 void formula_xml_processor::parse_files(const std::vector<std::string>& filepaths)
 {
     for (const std::string& filepath : filepaths)
-        parse_file(filepath);
+    {
+        trie_builder trie = parse_file(filepath);
+        m_trie.merge(trie);
+
+        cout << "cumulative formula entry count: " << m_trie.size() << endl;
+    }
 }
 
 void formula_xml_processor::write_files()

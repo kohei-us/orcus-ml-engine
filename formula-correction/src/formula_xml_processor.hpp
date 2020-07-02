@@ -19,7 +19,7 @@ class formula_xml_processor
     boost::filesystem::path m_outdir;
     const bool m_verbose;
 
-    void parse_file(const std::string& filepath);
+    trie_builder parse_file(const std::string& filepath);
 
 public:
     formula_xml_processor(const boost::filesystem::path& outdir, bool verbose);

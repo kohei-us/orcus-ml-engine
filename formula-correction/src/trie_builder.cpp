@@ -9,6 +9,9 @@
 
 using namespace std;
 
+trie_builder::trie_builder() {}
+trie_builder::trie_builder(trie_builder&& other) : m_trie(std::move(other.m_trie)) {}
+
 void trie_builder::insert_formula(const std::vector<uint16_t>& tokens)
 {
     if (tokens.empty())
@@ -43,6 +46,11 @@ void trie_builder::write(std::ostream& os)
 size_t trie_builder::size() const
 {
     return m_trie.size();
+}
+
+void trie_builder::swap(trie_builder& other)
+{
+    m_trie.swap(other.m_trie);
 }
 
 /* vim:set shiftwidth=4 softtabstop=4 expandtab: */
