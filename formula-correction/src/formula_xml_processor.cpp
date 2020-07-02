@@ -17,8 +17,6 @@
 #include <ixion/formula_function_opcode.hpp>
 
 namespace fs = boost::filesystem;
-using std::cout;
-using std::cerr;
 using std::endl;
 using orcus::pstring;
 
@@ -223,6 +221,7 @@ class xml_handler : public orcus::sax_token_handler
 
     null_buffer m_null_buf;
     std::ostream m_of;
+    std::ostringstream& m_co; // console output buffer
 
     std::vector<xml_name_t> m_stack;
     std::vector<uint16_t> m_formula_tokens;
@@ -380,23 +379,23 @@ class xml_handler : public orcus::sax_token_handler
         if (!print_report)
             return;
 
-        cout << endl;
-        cout << "  document path: " << m_filepath << endl;
+        m_co << endl;
+        m_co << "  document path: " << m_filepath << endl;
 
         if (!m_invalid_formula_counts.empty())
         {
-            cout << endl;
-            cout << "  invalid formulas:" << endl;
+            m_co << endl;
+            m_co << "  invalid formulas:" << endl;
             for (const auto& entry : m_invalid_formula_counts)
-                cout << "    - " << entry.first << ": " << entry.second << endl;
+                m_co << "    - " << entry.first << ": " << entry.second << endl;
         }
 
         if (!m_invalid_name_counts.empty())
         {
-            cout << endl;
-            cout << "  invalid names:" << endl;
+            m_co << endl;
+            m_co << "  invalid names:" << endl;
             for (const auto& entry : m_invalid_name_counts)
-                cout << "    - " << entry.first << ": " << entry.second << endl;
+                m_co << "    - " << entry.first << ": " << entry.second << endl;
         }
     }
 
@@ -411,7 +410,7 @@ class xml_handler : public orcus::sax_token_handler
                 m_sheet_names.insert(m_str_pool.intern(attr.value).first);
 
                 if (m_verbose)
-                    cout << "  * sheet: " << attr.value << endl;
+                    m_co << "  * sheet: " << attr.value << endl;
             }
         }
     }
@@ -440,7 +439,7 @@ class xml_handler : public orcus::sax_token_handler
         }
 
         if (m_verbose)
-            cout << "  * named expression: name: '" << name << "', scope: " << scope;
+            m_co << "  * named expression: name: '" << name << "', scope: " << scope;
 
         if (scope == "global")
             m_global_named_exps.insert(m_str_pool.intern(name).first);
@@ -448,7 +447,7 @@ class xml_handler : public orcus::sax_token_handler
         {
             // sheet-local named expression
             if (m_verbose)
-                cout << ", sheet='" << sheet << "'";
+                m_co << ", sheet='" << sheet << "'";
 
             if (!m_sheet_names.count(sheet))
             {
@@ -466,7 +465,7 @@ class xml_handler : public orcus::sax_token_handler
         }
 
         if (m_verbose)
-            cout << endl;
+            m_co << endl;
     }
 
     void start_formula(const xml_name_t parent, const orcus::xml_token_element_t& elem)
@@ -501,7 +500,7 @@ class xml_handler : public orcus::sax_token_handler
         m_cur_formula_sheet = m_str_pool.intern(sheet).first;
 
         if (m_verbose)
-            cout << "  * formula: " << formula << endl;
+            m_co << "  * formula: " << formula << endl;
 
         m_of << formula << endl;
     }
@@ -512,7 +511,7 @@ class xml_handler : public orcus::sax_token_handler
             return;
 
         if (m_verbose)
-            cout << "    * formula tokens: " << m_formula_tokens.size() << endl;
+            m_co << "    * formula tokens: " << m_formula_tokens.size() << endl;
 
         m_trie.insert_formula(m_formula_tokens);
 
@@ -555,7 +554,7 @@ class xml_handler : public orcus::sax_token_handler
             throw std::runtime_error("unknown token type!");
 
         if (m_verbose)
-            cout << "    * token: '" << s << "', type: " << type << " (" << tt << ")";
+            m_co << "    * token: '" << s << "', type: " << type << " (" << tt << ")";
 
         uint16_t encoded = tt - 1;
 
@@ -570,7 +569,7 @@ class xml_handler : public orcus::sax_token_handler
                 encoded = encode_operator(ot);
 
                 if (m_verbose)
-                    cout << ", op-type: " << ot;
+                    m_co << ", op-type: " << ot;
                 break;
             }
             case token_type::t_function:
@@ -582,7 +581,7 @@ class xml_handler : public orcus::sax_token_handler
                 encoded = encode_function(fft);
 
                 if (m_verbose)
-                    cout << ", func-id: " << int(fft) << " (" << ixion::get_formula_function_name(fft) << ")";
+                    m_co << ", func-id: " << int(fft) << " (" << ixion::get_formula_function_name(fft) << ")";
                 break;
             }
             case token_type::t_name:
@@ -591,7 +590,7 @@ class xml_handler : public orcus::sax_token_handler
                 if (!name_exists(s, m_cur_formula_sheet))
                 {
                     if (m_verbose)
-                        cout << ", (name not found)";
+                        m_co << ", (name not found)";
 
                     m_valid_formula = false;
                     increment_name_count(m_invalid_name_counts, s);
@@ -602,10 +601,9 @@ class xml_handler : public orcus::sax_token_handler
             {
                 // Don't process formula containing error tokens.
                 if (m_verbose)
-                    cout << ", (skip this formula)";
+                    m_co << ", (skip this formula)";
 
                 m_valid_formula = false;
-                cerr << "error token" << endl;
                 break;
             }
         }
@@ -615,18 +613,19 @@ class xml_handler : public orcus::sax_token_handler
             m_formula_tokens.push_back(encoded);
 
             if (m_verbose)
-                cout << ", encoded: " << encoded;
+                m_co << ", encoded: " << encoded;
         }
 
         if (m_verbose)
-            cout << endl;
+            m_co << endl;
     }
 
 public:
 
-    xml_handler(bool verbose) :
+    xml_handler(bool verbose, std::ostringstream& co) :
         m_null_buf(),
         m_of(&m_null_buf),
+        m_co(co),
         m_verbose(verbose) {}
 
     void start_element(const orcus::xml_token_element_t& elem)
@@ -740,13 +739,15 @@ trie_builder formula_xml_processor::launch_worker_thread(const path_pos_pair_typ
 
 trie_builder formula_xml_processor::parse_file(const std::string& filepath)
 {
+    std::ostringstream co; // console output
+
     orcus::file_content content(filepath.data());
-    cout << "--" << endl;
-    cout << "filepath: " << filepath << " (size: " << content.size() << ")" << endl;
+    co << "--" << endl;
+    co << "filepath: " << filepath << " (size: " << content.size() << ")" << endl;
 
     orcus::xmlns_repository repo;
     auto cxt = repo.create_context();
-    xml_handler hdl(m_verbose);
+    xml_handler hdl(m_verbose, co);
     orcus::tokens token_map(token_labels, ORCUS_N_ELEMENTS(token_labels));
     orcus::sax_token_parser<xml_handler> parser(content.data(), content.size(), token_map, cxt, hdl);
 
@@ -756,13 +757,15 @@ trie_builder formula_xml_processor::parse_file(const std::string& filepath)
     }
     catch (const std::exception& e)
     {
-        cout << endl;
-        cout << "  XML parse error: " << e.what() << endl;
+        co << endl;
+        co << "  XML parse error: " << e.what() << endl;
+        std::cout << co.str();
         return trie_builder();
     }
 
     trie_builder trie;
     hdl.pop_trie(trie);
+    std::cout << co.str();
     return trie;
 }
 
@@ -779,8 +782,6 @@ void formula_xml_processor::parse_files(const std::vector<std::string>& filepath
             {
                 trie_builder trie = parse_file(filepath);
                 m_trie.merge(trie);
-
-                cout << "cumulative formula entry count: " << m_trie.size() << endl;
             }
 
             break;
@@ -798,8 +799,6 @@ void formula_xml_processor::parse_files(const std::vector<std::string>& filepath
             {
                 trie_builder trie = queue.get_one();
                 m_trie.merge(trie);
-
-                cout << "cumulative formula entry count: " << m_trie.size() << endl;
             }
             break;
         }
@@ -831,6 +830,7 @@ void formula_xml_processor::parse_files(const std::vector<std::string>& filepath
 
             std::vector<future_type> futures;
 
+            // Dispatch the worker threads.
             for (size_t i = 0; i < worker_count; ++i)
             {
                 auto future = std::async(
@@ -838,6 +838,9 @@ void formula_xml_processor::parse_files(const std::vector<std::string>& filepath
 
                 futures.push_back(std::move(future));
             }
+
+            // Wait on all worker threads.
+            std::cout << "merging data from all worker threads..." << endl;
 
             for (future_type& future : futures)
             {
