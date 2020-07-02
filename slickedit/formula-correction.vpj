@@ -57,12 +57,14 @@
             <F N="../formula-correction/src/collect_tokens.cpp"/>
             <F N="../formula-correction/misc/extract-formulas.py"/>
             <F N="../formula-correction/src/formula_data_parser.cpp"/>
+            <F N="../formula-correction/src/formula_xml_processor.cpp"/>
             <F N="../formula-correction/src/trie_builder.cpp"/>
         </Folder>
         <Folder
             Name="Header Files"
             Filters="*.h;*.H;*.hh;*.hpp;*.hxx;*.h++;*.inc;*.sh;*.cpy;*.if"
             GUID="{909AC0E9-B711-4468-BF80-658986195066}">
+            <F N="../formula-correction/src/formula_xml_processor.hpp"/>
             <F N="../formula-correction/src/trie_builder.hpp"/>
         </Folder>
         <Folder

@@ -1,6 +1,7 @@
 
 add_executable(formula-data-parser
     formula_data_parser.cpp
+    formula_xml_processor.cpp
     trie_builder.cpp
 )
 
