@@ -840,13 +840,14 @@ void formula_xml_processor::parse_files(const std::vector<std::string>& filepath
             }
 
             // Wait on all worker threads.
-            std::cout << "merging data from all worker threads..." << endl;
 
             for (future_type& future : futures)
             {
                 trie_builder trie = future.get();
                 m_trie.merge(trie);
             }
+
+            std::cout << "total entries: " << m_trie.size() << endl;
 
             break;
         }
