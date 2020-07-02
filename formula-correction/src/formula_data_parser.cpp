@@ -9,11 +9,6 @@
 #include <boost/filesystem.hpp>
 
 #include <iostream>
-#include <vector>
-#include <unordered_set>
-#include <unordered_map>
-#include <fstream>
-#include <map>
 
 #include "formula_xml_processor.hpp"
 
