@@ -19,7 +19,11 @@ class trie_builder
 public:
     void insert_formula(const std::vector<uint16_t>& tokens);
 
+    void merge(const trie_builder& other);
+
     void write(std::ostream& os);
+
+    size_t size() const;
 };
 
 

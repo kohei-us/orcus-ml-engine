@@ -230,7 +230,7 @@ class xml_handler : public orcus::sax_token_handler
     str_counter_t m_invalid_formula_counts;
     str_counter_t m_invalid_name_counts;
 
-    trie_builder& m_trie;
+    trie_builder m_trie;
     const bool m_verbose;
     bool m_valid_formula = false;
 
@@ -616,10 +616,9 @@ class xml_handler : public orcus::sax_token_handler
 
 public:
 
-    xml_handler(trie_builder& trie, bool verbose) :
+    xml_handler(bool verbose) :
         m_null_buf(),
         m_of(&m_null_buf),
-        m_trie(trie),
         m_verbose(verbose) {}
 
     void start_element(const orcus::xml_token_element_t& elem)
@@ -700,6 +699,11 @@ public:
 
         m_stack.pop_back();
     }
+
+    const trie_builder& get_trie() const
+    {
+        return m_trie;
+    }
 };
 
 class processor
@@ -722,7 +726,7 @@ public:
 
         orcus::xmlns_repository repo;
         auto cxt = repo.create_context();
-        xml_handler hdl(m_trie, m_verbose);
+        xml_handler hdl(m_verbose);
         orcus::tokens token_map(token_labels, ORCUS_N_ELEMENTS(token_labels));
         orcus::sax_token_parser<xml_handler> parser(content.data(), content.size(), token_map, cxt, hdl);
 
@@ -734,7 +738,13 @@ public:
         {
             cout << endl;
             cout << "  XML parse error: " << e.what() << endl;
+            return;
         }
+
+        m_trie.merge(hdl.get_trie());
+
+        cout << endl;
+        cout << "cumulative formula entry count: " << m_trie.size() << endl;
     }
 
     void write_files()

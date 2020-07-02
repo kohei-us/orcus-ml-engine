@@ -6,7 +6,6 @@
  */
 
 #include "trie_builder.hpp"
-#include <iostream>
 
 using namespace std;
 
@@ -23,10 +22,27 @@ void trie_builder::insert_formula(const std::vector<uint16_t>& tokens)
         ++it->second; // increment the counter.
 }
 
+void trie_builder::merge(const trie_builder& other)
+{
+    for (const auto& entry : other.m_trie)
+    {
+        auto it = m_trie.find(entry.first);
+        if (it == m_trie.end())
+            m_trie.insert(entry.first, entry.second);
+        else
+            it->second += entry.second;
+    }
+}
+
 void trie_builder::write(std::ostream& os)
 {
     auto packed = m_trie.pack();
     packed.save_state(os);
+}
+
+size_t trie_builder::size() const
+{
+    return m_trie.size();
 }
 
 /* vim:set shiftwidth=4 softtabstop=4 expandtab: */
