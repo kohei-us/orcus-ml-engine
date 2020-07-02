@@ -805,7 +805,7 @@ void formula_xml_processor::parse_files(const std::vector<std::string>& filepath
         }
         case thread_policy::split_load:
         {
-            size_t worker_count = 4;
+            size_t worker_count = std::thread::hardware_concurrency();
             size_t data_size = filepaths.size() / worker_count;
 
             // Split the data load evenly.
