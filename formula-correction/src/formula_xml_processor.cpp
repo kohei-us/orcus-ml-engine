@@ -723,6 +723,21 @@ void formula_xml_processor::launch_queue_dispatcher_thread(
         queue->push(&formula_xml_processor::parse_file, this, filepath);
 }
 
+trie_builder formula_xml_processor::launch_worker_thread(const path_pos_pair_type& filepaths)
+{
+    trie_builder trie;
+
+    std::for_each(filepaths.first, filepaths.second,
+        [&trie, this](const std::string& filepath)
+        {
+            trie_builder this_trie = parse_file(filepath);
+            trie.merge(this_trie);
+        }
+    );
+
+    return trie;
+}
+
 trie_builder formula_xml_processor::parse_file(const std::string& filepath)
 {
     orcus::file_content content(filepath.data());
@@ -752,36 +767,86 @@ trie_builder formula_xml_processor::parse_file(const std::string& filepath)
 }
 
 formula_xml_processor::formula_xml_processor(const fs::path& outdir, bool verbose) :
-    m_outdir(outdir), m_verbose(verbose), m_use_threads(true) {}
+    m_outdir(outdir), m_verbose(verbose) {}
 
 void formula_xml_processor::parse_files(const std::vector<std::string>& filepaths)
 {
-    if (!m_use_threads)
+    switch (m_thread_policy)
     {
-        for (const std::string& filepath : filepaths)
+        case thread_policy::disabled:
         {
-            trie_builder trie = parse_file(filepath);
-            m_trie.merge(trie);
+            for (const std::string& filepath : filepaths)
+            {
+                trie_builder trie = parse_file(filepath);
+                m_trie.merge(trie);
 
-            cout << "cumulative formula entry count: " << m_trie.size() << endl;
+                cout << "cumulative formula entry count: " << m_trie.size() << endl;
+            }
+
+            break;
         }
+        case thread_policy::linear_async:
+        {
+            size_t file_count = filepaths.size();
 
-        return;
-    }
+            queue_type queue(32);
 
-    size_t file_count = filepaths.size();
+            std::thread t(&formula_xml_processor::launch_queue_dispatcher_thread, this, &queue, filepaths);
+            scoped_guard guard(std::move(t));
 
-    queue_type queue(32);
+            for (size_t i = 0; i < file_count; ++i)
+            {
+                trie_builder trie = queue.get_one();
+                m_trie.merge(trie);
 
-    std::thread t(&formula_xml_processor::launch_queue_dispatcher_thread, this, &queue, filepaths);
-    scoped_guard guard(std::move(t));
+                cout << "cumulative formula entry count: " << m_trie.size() << endl;
+            }
+            break;
+        }
+        case thread_policy::split_load:
+        {
+            size_t worker_count = 4;
+            size_t data_size = filepaths.size() / worker_count;
 
-    for (size_t i = 0; i < file_count; ++i)
-    {
-        trie_builder trie = queue.get_one();
-        m_trie.merge(trie);
+            // Split the data load evenly.
+            std::vector<path_pos_pair_type> filepaths_set(worker_count);
+            auto pos = filepaths.begin();
+            auto end = pos;
+            std::advance(end, data_size);
 
-        cout << "cumulative formula entry count: " << m_trie.size() << endl;
+            for (size_t i = 0; i < worker_count - 1; ++i)
+            {
+                auto& set = filepaths_set[i];
+                set.first = pos;
+                set.second = end;
+                pos = end;
+                std::advance(end, data_size);
+            }
+
+            end = filepaths.end();
+            filepaths_set.back().first = pos;
+            filepaths_set.back().second = end;
+
+            using future_type = std::future<trie_builder>;
+
+            std::vector<future_type> futures;
+
+            for (size_t i = 0; i < worker_count; ++i)
+            {
+                auto future = std::async(
+                    std::launch::async, &formula_xml_processor::launch_worker_thread, this, filepaths_set[i]);
+
+                futures.push_back(std::move(future));
+            }
+
+            for (future_type& future : futures)
+            {
+                trie_builder trie = future.get();
+                m_trie.merge(trie);
+            }
+
+            break;
+        }
     }
 }
 
