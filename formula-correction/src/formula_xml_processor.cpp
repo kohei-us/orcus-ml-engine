@@ -219,8 +219,6 @@ class xml_handler : public orcus::sax_token_handler
     using named_name_set_t = std::unordered_map<pstring, name_set_t, pstring::hash>;
     using str_counter_t = std::map<pstring, uint32_t>;
 
-    null_buffer m_null_buf;
-    std::ostream m_of;
     std::ostringstream& m_co; // console output buffer
 
     std::vector<xml_name_t> m_stack;
@@ -501,8 +499,6 @@ class xml_handler : public orcus::sax_token_handler
 
         if (m_verbose)
             m_co << "  * formula: " << formula << endl;
-
-        m_of << formula << endl;
     }
 
     void end_formula()
@@ -518,12 +514,9 @@ class xml_handler : public orcus::sax_token_handler
 #if 0
         // Write the tokens to the output file.
         std::copy(m_formula_tokens.begin(), m_formula_tokens.end(), std::ostream_iterator<uint16_t>(m_of, ","));
-        m_of << endl;
 
         // Decode encoded tokens and write it to the output file too.
         auto decoded = decode_tokens(m_formula_tokens);
-        std::copy(decoded.begin(), decoded.end(), std::ostream_iterator<std::string>(m_of, " "));
-        m_of << endl;
 #endif
     }
 
@@ -623,8 +616,6 @@ class xml_handler : public orcus::sax_token_handler
 public:
 
     xml_handler(bool verbose, std::ostringstream& co) :
-        m_null_buf(),
-        m_of(&m_null_buf),
         m_co(co),
         m_verbose(verbose) {}
 
