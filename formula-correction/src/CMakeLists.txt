@@ -5,6 +5,11 @@ add_executable(formula-data-parser
     trie_builder.cpp
 )
 
+add_executable(formula-data-interpreter
+    formula_data_interpreter.cpp
+    trie_loader.cpp
+)
+
 add_executable(collect-tokens collect_tokens.cpp)
 
 target_link_libraries(formula-data-parser
@@ -13,9 +18,16 @@ target_link_libraries(formula-data-parser
     ${LIBIXION_LDFLAGS}
     ${CMAKE_THREAD_LIBS_INIT}
 )
+
+target_link_libraries(formula-data-interpreter
+    ${Boost_LIBRARIES}
+    ${LIBIXION_LDFLAGS}
+    ${CMAKE_THREAD_LIBS_INIT}
+)
+
 target_link_libraries(collect-tokens ${Boost_LIBRARIES} ${LIBORCUS_LDFLAGS})
 
-install(TARGETS formula-data-parser collect-tokens
+install(TARGETS formula-data-parser formula-data-interpreter collect-tokens
     RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR}
     LIBRARY DESTINATION ${CMAKE_INSTALL_LIBDIR}
     ARCHIVE DESTINATION ${CMAKE_INSTALL_LIBDIR}
