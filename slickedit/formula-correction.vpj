@@ -60,6 +60,7 @@
             <F N="../formula-correction/src/formula_xml_processor.cpp"/>
             <F N="../formula-correction/src/trie_builder.cpp"/>
             <F N="../formula-correction/src/trie_loader.cpp"/>
+            <F N="../formula-correction/src/types.cpp"/>
         </Folder>
         <Folder
             Name="Header Files"
@@ -69,6 +70,7 @@
             <F N="../formula-correction/src/formula_xml_processor.hpp"/>
             <F N="../formula-correction/src/trie_builder.hpp"/>
             <F N="../formula-correction/src/trie_loader.hpp"/>
+            <F N="../formula-correction/src/types.hpp"/>
         </Folder>
         <Folder
             Name="Resource Files"

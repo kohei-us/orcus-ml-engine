@@ -9,8 +9,10 @@
 
 #include <boost/program_options.hpp>
 #include <boost/filesystem.hpp>
+#include <orcus/global.hpp>
 
 #include <iostream>
+#include <fstream>
 
 namespace po = boost::program_options;
 namespace fs = boost::filesystem;
@@ -70,6 +72,18 @@ int main(int argc, char** argv)
     }
 
     cout << "number of entries: " << trie.size() << endl;
+
+    std::ostream* is = &cout;
+    std::unique_ptr<std::ofstream> output;
+
+    if (vm.count("output"))
+    {
+        std::string s = vm["output"].as<std::string>();
+        output = orcus::make_unique<std::ofstream>(s);
+        is = output.get();
+    }
+
+    trie.dump(*is);
 
     return EXIT_SUCCESS;
 }

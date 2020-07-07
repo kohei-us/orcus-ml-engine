@@ -6,6 +6,7 @@
  */
 
 #include "formula_xml_processor.hpp"
+#include "types.hpp"
 
 #include <mdds/sorted_string_map.hpp>
 #include <orcus/sax_token_parser.hpp>
@@ -37,126 +38,6 @@ public:
         m_thread.join();
     }
 };
-
-namespace op_type {
-
-enum v : uint8_t
-{
-    op_unknown = 0,   // 0
-    op_plus,          // 1
-    op_minus,         // 2
-    op_divide,        // 3
-    op_multiply,      // 4
-    op_exponent,      // 5
-    op_concat,        // 6
-    op_equal,         // 7
-    op_not_equal,     // 8
-    op_less,          // 9
-    op_greater,       // 10
-    op_less_equal,    // 11
-    op_greater_equal, // 12
-    op_open,          // 13
-    op_close,         // 14
-    op_sep,           // 15
-};
-
-typedef mdds::sorted_string_map<v> map_type;
-
-// Keys must be sorted.
-const std::vector<map_type::entry> entries =
-{
-    { ORCUS_ASCII("&"),  op_concat        }, // 0
-    { ORCUS_ASCII("("),  op_open          }, // 1
-    { ORCUS_ASCII(")"),  op_close         }, // 2
-    { ORCUS_ASCII("*"),  op_multiply      }, // 3
-    { ORCUS_ASCII("+"),  op_plus          }, // 4
-    { ORCUS_ASCII(","),  op_sep           }, // 5
-    { ORCUS_ASCII("-"),  op_minus         }, // 6
-    { ORCUS_ASCII("/"),  op_divide        }, // 7
-    { ORCUS_ASCII("<"),  op_less          }, // 8
-    { ORCUS_ASCII("<="), op_less_equal    }, // 9
-    { ORCUS_ASCII("<>"), op_not_equal     }, // 10
-    { ORCUS_ASCII("="),  op_equal         }, // 11
-    { ORCUS_ASCII(">"),  op_greater       }, // 12
-    { ORCUS_ASCII(">="), op_greater_equal }, // 13
-    { ORCUS_ASCII("^"),  op_exponent      }, // 14
-};
-
-// value-to-string map
-const std::vector<int8_t> v2s_map = {
-    -1, // op_unknown
-    4,  // op_plus
-    6,  // op_minus
-    7,  // op_divide
-    3,  // op_multiply
-    14, // op_exponent
-    0,  // op_concat
-    11, // op_equal
-    10, // op_not_equal
-    8,  // op_less
-    12, // op_greater
-    9,  // op_less_equal
-    13, // op_greater_equal
-    1,  // op_open
-    2,  // op_close
-    5,  // op_sep
-};
-
-const map_type& get()
-{
-    static map_type mt(entries.data(), entries.size(), op_unknown);
-    return mt;
-}
-
-pstring str(op_type::v v)
-{
-    if (v >= v2s_map.size())
-        throw std::logic_error("op type value too large!");
-
-    int8_t pos = v2s_map[v];
-    if (pos < 0)
-        return pstring();
-
-    const map_type::entry& e = entries[pos];
-    return pstring(e.key, e.keylen);
-}
-
-} // namespace op_type
-
-namespace token_type {
-
-enum v : uint8_t
-{
-    t_unknown = 0, // 0
-    t_error,       // 1
-    t_function,    // 2
-    t_name,        // 3
-    t_operator,    // 4
-    t_reference,   // 5
-    t_value,       // 6
-};
-
-typedef mdds::sorted_string_map<v> map_type;
-
-// Keys must be sorted.
-const std::vector<map_type::entry> entries =
-{
-    { ORCUS_ASCII("error"),     t_error     },
-    { ORCUS_ASCII("function"),  t_function  },
-    { ORCUS_ASCII("name"),      t_name      },
-    { ORCUS_ASCII("operator"),  t_operator  },
-    { ORCUS_ASCII("reference"), t_reference },
-    { ORCUS_ASCII("unknown"),   t_unknown   },
-    { ORCUS_ASCII("value"),     t_value     },
-};
-
-const map_type& get()
-{
-    static map_type mt(entries.data(), entries.size(), t_unknown);
-    return mt;
-}
-
-} // namespace token_type
 
 const char* token_labels[] = {
     "???",                // 0
@@ -239,59 +120,6 @@ class xml_handler : public orcus::sax_token_handler
     const bool m_verbose;
     bool m_valid_formula = false;
 
-    static std::vector<std::string> decode_tokens(const std::vector<uint16_t>& tokens)
-    {
-        std::vector<std::string> decoded;
-        decoded.reserve(tokens.size());
-
-        for (const uint16_t v : tokens)
-        {
-            // extract the token type value.
-            uint16_t ttv = (v & 0x0007) + 1;
-            token_type::v tt = static_cast<token_type::v>(ttv);
-
-            switch (tt)
-            {
-                case token_type::t_error:
-                    decoded.push_back("<error>");
-                    break;
-                case token_type::t_function:
-                {
-                    // Extract the function token value.
-                    uint16_t ftv = v & 0xFFF8;
-                    ftv = (ftv >> 3) + 1;
-                    auto fft = static_cast<ixion::formula_function_t>(ftv);
-                    std::ostringstream os;
-                    os << "<func:" << ixion::get_formula_function_name(fft) << ">";
-                    decoded.push_back(os.str());
-                    break;
-                }
-                case token_type::t_name:
-                    decoded.push_back("<name>");
-                    break;
-                case token_type::t_operator:
-                {
-                    // Extract the operator token value.
-                    uint16_t otv = v & 0xFFF8;
-                    otv = (otv >> 3) + 1;
-                    auto ot = static_cast<op_type::v>(otv);
-                    decoded.push_back(op_type::str(ot).str());
-                    break;
-                }
-                case token_type::t_reference:
-                    decoded.push_back("<ref>");
-                    break;
-                case token_type::t_value:
-                    decoded.push_back("<value>");
-                    break;
-                default:
-                    throw std::logic_error("wrong token type!");
-            }
-        }
-
-        return decoded;
-    }
-
     static void check_parent(const xml_name_t& parent, const orcus::xml_token_t expected)
     {
         if (parent != xml_name_t(orcus::XMLNS_UNKNOWN_ID, expected))
@@ -304,7 +132,7 @@ class xml_handler : public orcus::sax_token_handler
             throw std::runtime_error("invalid structure");
     }
 
-    static uint16_t encode_operator(const op_type::v ot)
+    static uint16_t encode_operator(const formula_op_t ot)
     {
         // 3 bits (0-7) for token type (1-6)
         // 4 bits (0-15) for operator type (1-15)
@@ -316,7 +144,7 @@ class xml_handler : public orcus::sax_token_handler
 
         // subtract it by one and shift 3 bits.
         uint16_t encoded = --ot_v << 3;
-        encoded += token_type::t_operator - 1; // subtract it by one
+        encoded += formula_token_t::t_operator - 1; // subtract it by one
         return encoded;
     }
 
@@ -332,7 +160,7 @@ class xml_handler : public orcus::sax_token_handler
 
         // subtract it by one and shift 3 bits.
         uint16_t encoded = --fft_v << 3;
-        encoded += token_type::t_function - 1; // subtract it by one
+        encoded += formula_token_t::t_function - 1; // subtract it by one
         return encoded;
     }
 
@@ -510,14 +338,6 @@ class xml_handler : public orcus::sax_token_handler
             m_co << "    * formula tokens: " << m_formula_tokens.size() << endl;
 
         m_trie.insert_formula(m_formula_tokens);
-
-#if 0
-        // Write the tokens to the output file.
-        std::copy(m_formula_tokens.begin(), m_formula_tokens.end(), std::ostream_iterator<uint16_t>(m_of, ","));
-
-        // Decode encoded tokens and write it to the output file too.
-        auto decoded = decode_tokens(m_formula_tokens);
-#endif
     }
 
     void start_token(const xml_name_t parent, const orcus::xml_token_element_t& elem)
@@ -542,8 +362,8 @@ class xml_handler : public orcus::sax_token_handler
             }
         }
 
-        token_type::v tt = token_type::get().find(type.data(), type.size());
-        if (tt == token_type::t_unknown)
+        formula_token_t tt = to_formula_token(type.data(), type.size());
+        if (tt == formula_token_t::t_unknown)
             throw std::runtime_error("unknown token type!");
 
         if (m_verbose)
@@ -553,10 +373,10 @@ class xml_handler : public orcus::sax_token_handler
 
         switch (tt)
         {
-            case token_type::t_operator:
+            case formula_token_t::t_operator:
             {
-                op_type::v ot = op_type::get().find(s.data(), s.size());
-                if (ot == op_type::op_unknown)
+                formula_op_t ot = to_formula_op(s.data(), s.size());
+                if (ot == formula_op_t::op_unknown)
                     throw std::runtime_error("unknown operator!");
 
                 encoded = encode_operator(ot);
@@ -565,7 +385,7 @@ class xml_handler : public orcus::sax_token_handler
                     m_co << ", op-type: " << ot;
                 break;
             }
-            case token_type::t_function:
+            case formula_token_t::t_function:
             {
                 ixion::formula_function_t fft = ixion::get_formula_function_opcode(s.data(), s.size());
                 if (fft == ixion::formula_function_t::func_unknown)
@@ -577,7 +397,7 @@ class xml_handler : public orcus::sax_token_handler
                     m_co << ", func-id: " << int(fft) << " (" << ixion::get_formula_function_name(fft) << ")";
                 break;
             }
-            case token_type::t_name:
+            case formula_token_t::t_name:
             {
                 // Make sure the name actually exists in the document.
                 if (!name_exists(s, m_cur_formula_sheet))
@@ -590,7 +410,7 @@ class xml_handler : public orcus::sax_token_handler
                 }
                 break;
             }
-            case token_type::t_error:
+            case formula_token_t::t_error:
             {
                 // Don't process formula containing error tokens.
                 if (m_verbose)

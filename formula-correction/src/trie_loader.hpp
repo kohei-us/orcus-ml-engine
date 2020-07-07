@@ -7,6 +7,8 @@
 
 #pragma once
 
+#include "types.hpp"
+
 #include <mdds/trie_map.hpp>
 
 class trie_loader
@@ -22,6 +24,8 @@ public:
     void load(std::istream& is);
 
     size_t size() const;
+
+    void dump(std::ostream& os) const;
 };
 
 /* vim:set shiftwidth=4 softtabstop=4 expandtab: */
