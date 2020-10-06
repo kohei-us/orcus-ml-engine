@@ -20,10 +20,8 @@ FORMULAS_FILENAME_XML = f"{config.prefix_skip}formulas.xml"
 
 
 def to_string(obj):
-    if isinstance(obj, orcus.FormulaTokenType):
-        n = len("FormulaTokenType.")
-        s = str(obj)
-        return s[n:].lower()
+    if isinstance(obj, (orcus.FormulaTokenType, orcus.FormulaTokenOp)):
+        return obj.name.lower().replace('_', '-')
 
     return str(obj)
 
@@ -50,7 +48,7 @@ def process_document(filepath, doc):
 
     def write_tokens(iter, f):
         for token in iter:
-            f.write(f'<token s="{escape_str(str(token))}" type="{to_string(token.type)}"/>')
+            f.write(f'<token s="{escape_str(str(token))}" type="{to_string(token.type)}" op="{to_string(token.op)}"/>')
 
     def write_global_named_exps(iter, f):
         for name, exp in iter:
