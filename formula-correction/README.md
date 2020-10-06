@@ -33,7 +33,7 @@ command:
 ```bash
 python3 -m orcus.tools.file_processor \
     -p misc/extract-formulas.py \
-    --skip-files misc/skip-files.txt \
+    --skip-file misc/skip-files.txt \
     ./bugdocs
 ```
 in order to process all the documents and extract their formula data.  The extracted
