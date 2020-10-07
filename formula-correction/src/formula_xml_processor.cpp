@@ -59,7 +59,8 @@ const char* token_labels[] = {
     "sheets",             // 16
     "token",              // 17
     "type",               // 18
-    "valid",              // 19
+    "op",                 // 19
+    "valid",              // 20
 };
 
 // skip 0 which is reserved for the unknown token.
@@ -81,7 +82,8 @@ constexpr orcus::xml_token_t XML_sheet              = 15;
 constexpr orcus::xml_token_t XML_sheets             = 16;
 constexpr orcus::xml_token_t XML_token              = 17;
 constexpr orcus::xml_token_t XML_type               = 18;
-constexpr orcus::xml_token_t XML_valid              = 19;
+constexpr orcus::xml_token_t XML_op                 = 19;
+constexpr orcus::xml_token_t XML_valid              = 20;
 
 class xml_handler : public orcus::sax_token_handler
 {
