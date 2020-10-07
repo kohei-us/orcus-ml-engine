@@ -51,4 +51,19 @@ in order to collect all the formula XML files into directory named `formulas`.
 
 ### Parse formula XML files
 
-TBD
+First, build the binary executables by running the following commands:
+
+```bash
+mkdir build
+cd build
+cmake .. -DCMAKE_BUILD_TYPE=Release -DCMAKE_INSTALL_PREFIX=../install
+make install
+cd ..  # go back up to the root.
+```
+
+Once built, run:
+
+```
+./install/bin/formula-data-parser -o out formulas/*.xml
+```
+and the formula token data will be written to the `out` directory.

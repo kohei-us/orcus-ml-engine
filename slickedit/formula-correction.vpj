@@ -56,6 +56,7 @@
             GUID="{F1A3C78F-02B6-4B5E-8909-8B057CF15E17}">
             <F N="../formula-correction/src/collect_tokens.cpp"/>
             <F N="../formula-correction/misc/extract-formulas.py"/>
+            <F N="../formula-correction/src/formula_data_interpreter.cpp"/>
             <F N="../formula-correction/src/formula_data_parser.cpp"/>
             <F N="../formula-correction/src/formula_xml_processor.cpp"/>
             <F N="../formula-correction/src/trie_builder.cpp"/>

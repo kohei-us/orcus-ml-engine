@@ -79,7 +79,7 @@ int main(int argc, char** argv)
     if (vm.count("output"))
     {
         std::string s = vm["output"].as<std::string>();
-        output = orcus::make_unique<std::ofstream>(s);
+        output = std::make_unique<std::ofstream>(s);
         is = output.get();
     }
 
