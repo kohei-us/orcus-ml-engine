@@ -12,64 +12,79 @@
 
 namespace op_type {
 
-typedef mdds::sorted_string_map<formula_op_t> map_type;
+typedef mdds::sorted_string_map<ixion::fopcode_t> map_type;
 
 // Keys must be sorted.
 const std::vector<map_type::entry> entries =
 {
-    { ORCUS_ASCII("&"),  op_concat        }, // 0
-    { ORCUS_ASCII("("),  op_open          }, // 1
-    { ORCUS_ASCII(")"),  op_close         }, // 2
-    { ORCUS_ASCII("*"),  op_multiply      }, // 3
-    { ORCUS_ASCII("+"),  op_plus          }, // 4
-    { ORCUS_ASCII(","),  op_sep           }, // 5
-    { ORCUS_ASCII("-"),  op_minus         }, // 6
-    { ORCUS_ASCII("/"),  op_divide        }, // 7
-    { ORCUS_ASCII("<"),  op_less          }, // 8
-    { ORCUS_ASCII("<="), op_less_equal    }, // 9
-    { ORCUS_ASCII("<>"), op_not_equal     }, // 10
-    { ORCUS_ASCII("="),  op_equal         }, // 11
-    { ORCUS_ASCII(">"),  op_greater       }, // 12
-    { ORCUS_ASCII(">="), op_greater_equal }, // 13
-    { ORCUS_ASCII("^"),  op_exponent      }, // 14
+    { ORCUS_ASCII("close"),            ixion::fop_close            },
+    { ORCUS_ASCII("concat"),           ixion::fop_concat           },
+    { ORCUS_ASCII("divide"),           ixion::fop_divide           },
+    { ORCUS_ASCII("equal"),            ixion::fop_equal            },
+    { ORCUS_ASCII("error"),            ixion::fop_error            },
+    { ORCUS_ASCII("exponent"),         ixion::fop_exponent         },
+    { ORCUS_ASCII("function"),         ixion::fop_function         },
+    { ORCUS_ASCII("greater"),          ixion::fop_greater          },
+    { ORCUS_ASCII("greater-equal"),    ixion::fop_greater_equal    },
+    { ORCUS_ASCII("less"),             ixion::fop_less             },
+    { ORCUS_ASCII("less-equal"),       ixion::fop_less_equal       },
+    { ORCUS_ASCII("minus"),            ixion::fop_minus            },
+    { ORCUS_ASCII("multiply"),         ixion::fop_multiply         },
+    { ORCUS_ASCII("named-expression"), ixion::fop_named_expression },
+    { ORCUS_ASCII("not-equal"),        ixion::fop_not_equal        },
+    { ORCUS_ASCII("open"),             ixion::fop_open             },
+    { ORCUS_ASCII("plus"),             ixion::fop_plus             },
+    { ORCUS_ASCII("range-ref"),        ixion::fop_range_ref        },
+    { ORCUS_ASCII("sep"),              ixion::fop_sep              },
+    { ORCUS_ASCII("single-ref"),       ixion::fop_single_ref       },
+    { ORCUS_ASCII("string"),           ixion::fop_string           },
+    { ORCUS_ASCII("table-ref"),        ixion::fop_table_ref        },
+    { ORCUS_ASCII("unknown"),          ixion::fop_unknown          },
+    { ORCUS_ASCII("value"),            ixion::fop_value            },
 };
 
 // value-to-string map
-const std::vector<int8_t> v2s_map = {
-    -1, // op_unknown
-    4,  // op_plus
-    6,  // op_minus
-    7,  // op_divide
-    3,  // op_multiply
-    14, // op_exponent
-    0,  // op_concat
-    11, // op_equal
-    10, // op_not_equal
-    8,  // op_less
-    12, // op_greater
-    9,  // op_less_equal
-    13, // op_greater_equal
-    1,  // op_open
-    2,  // op_close
-    5,  // op_sep
+const std::vector<size_t> v2s_map = {
+    22, // unknown
+    19, // single-ref
+    17, // range-ref
+    21, // table-ref
+    13, // named-expression
+    20, // string
+    23, // value
+     6, // function
+    16, // plus
+    11, // minus
+     2, // divide
+    12, // multiply
+     5, // exponent
+     1, // concat
+     3, // equal
+    14, // not-equal
+     9, // less
+     7, // greater
+    10, // less-equal
+     8, // greater-equal
+    15, // open
+     0, // close
+    18, // sep
+     4, // error
 };
 
 const map_type& get()
 {
-    static map_type mt(entries.data(), entries.size(), op_unknown);
+    static map_type mt(entries.data(), entries.size(), ixion::fop_unknown);
     return mt;
 }
 
-orcus::pstring str(formula_op_t v)
+orcus::pstring str(ixion::fopcode_t v)
 {
-    if (v >= v2s_map.size())
+    size_t v2 = static_cast<size_t>(v);
+    if (v2 >= v2s_map.size())
         throw std::logic_error("op type value too large!");
 
-    int8_t pos = v2s_map[v];
-    if (pos < 0)
-        return orcus::pstring();
-
-    const map_type::entry& e = entries[pos];
+    size_t pos = v2s_map.at(v2);
+    const map_type::entry& e = entries.at(pos);
     return orcus::pstring(e.key, e.keylen);
 }
 
@@ -99,12 +114,12 @@ const map_type& get()
 
 } // namespace token_type
 
-formula_op_t to_formula_op(const char* p, size_t n)
+ixion::fopcode_t to_formula_op(const char* p, size_t n)
 {
     return op_type::get().find(p, n);
 }
 
-orcus::pstring to_string(formula_op_t v)
+orcus::pstring to_string(ixion::fopcode_t v)
 {
     return op_type::str(v);
 }

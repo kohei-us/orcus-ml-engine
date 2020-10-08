@@ -134,35 +134,18 @@ class xml_handler : public orcus::sax_token_handler
             throw std::runtime_error("invalid structure");
     }
 
-    static uint16_t encode_operator(const formula_op_t ot)
-    {
-        // 3 bits (0-7) for token type (1-6)
-        // 4 bits (0-15) for operator type (1-15)
-
-        uint16_t ot_v = ot;
-
-        if (!ot_v || ot_v > 15u)
-            throw std::runtime_error("operator type value is out-of-range!");
-
-        // subtract it by one and shift 3 bits.
-        uint16_t encoded = --ot_v << 3;
-        encoded += formula_token_t::t_operator - 1; // subtract it by one
-        return encoded;
-    }
-
     static uint16_t encode_function(const ixion::formula_function_t fft)
     {
-        // 3 bits (0-7) for token type (1-6)
-        // 9 bits (0-511) for function type (1-323)
+        // 5 bits (0-31) for opcode; 9 bits (0-511) for function type (1-323)
 
         uint16_t fft_v = uint16_t(fft);
 
         if (!fft_v || fft_v > 511u)
             throw std::runtime_error("function type value is out-of-range!");
 
-        // subtract it by one and shift 3 bits.
-        uint16_t encoded = --fft_v << 3;
-        encoded += formula_token_t::t_function - 1; // subtract it by one
+        // subtract it by one (to eliminate the 'unknown' value) and shift 5 bits.
+        uint16_t encoded = --fft_v << 5;
+        encoded += ixion::fop_function - 1; // eliminate the unknown value again.
         return encoded;
     }
 
@@ -349,7 +332,7 @@ class xml_handler : public orcus::sax_token_handler
         if (!m_valid_formula)
             return;
 
-        pstring s, type;
+        pstring s, type, op;
 
         for (const auto& attr : elem.attrs)
         {
@@ -361,33 +344,24 @@ class xml_handler : public orcus::sax_token_handler
                 case XML_type:
                     type = attr.value;
                     break;
+                case XML_op:
+                    op = attr.value;
+                    break;
             }
         }
 
-        formula_token_t tt = to_formula_token(type.data(), type.size());
-        if (tt == formula_token_t::t_unknown)
-            throw std::runtime_error("unknown token type!");
+        ixion::fopcode_t opc = to_formula_op(op.data(), op.size());
+        if (opc == ixion::fop_unknown)
+            throw std::runtime_error("unknown operator!");
 
         if (m_verbose)
-            m_co << "    * token: '" << s << "', type: " << type << " (" << tt << ")";
+            m_co << "    * token: '" << s << "', op: " << op;
 
-        uint16_t encoded = tt - 1;
+        uint16_t encoded = opc - 1;
 
-        switch (tt)
+        switch (opc)
         {
-            case formula_token_t::t_operator:
-            {
-                formula_op_t ot = to_formula_op(s.data(), s.size());
-                if (ot == formula_op_t::op_unknown)
-                    throw std::runtime_error("unknown operator!");
-
-                encoded = encode_operator(ot);
-
-                if (m_verbose)
-                    m_co << ", op-type: " << ot;
-                break;
-            }
-            case formula_token_t::t_function:
+            case ixion::fop_function:
             {
                 ixion::formula_function_t fft = ixion::get_formula_function_opcode(s.data(), s.size());
                 if (fft == ixion::formula_function_t::func_unknown)
@@ -399,7 +373,7 @@ class xml_handler : public orcus::sax_token_handler
                     m_co << ", func-id: " << int(fft) << " (" << ixion::get_formula_function_name(fft) << ")";
                 break;
             }
-            case formula_token_t::t_name:
+            case ixion::fop_named_expression:
             {
                 // Make sure the name actually exists in the document.
                 if (!name_exists(s, m_cur_formula_sheet))
@@ -412,7 +386,7 @@ class xml_handler : public orcus::sax_token_handler
                 }
                 break;
             }
-            case formula_token_t::t_error:
+            case ixion::fop_error:
             {
                 // Don't process formula containing error tokens.
                 if (m_verbose)

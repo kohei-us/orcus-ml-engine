@@ -21,46 +21,30 @@ std::vector<std::string> decode_tokens(const std::vector<uint16_t>& tokens)
 
     for (const uint16_t v : tokens)
     {
-        // extract the token type value.
-        uint16_t ttv = (v & 0x0007) + 1;
-        formula_token_t tt = static_cast<formula_token_t>(ttv);
+        // extract the opcode value
+        uint16_t ttv = (v & 0x001F) + 1;
+        ixion::fopcode_t op = static_cast<ixion::fopcode_t>(ttv);
 
-        switch (tt)
+        switch (op)
         {
-            case t_error:
+            case ixion::fop_error:
                 decoded.push_back("<error>");
                 break;
-            case t_function:
+            case ixion::fop_function:
             {
                 // Extract the function token value.
-                uint16_t ftv = v & 0xFFF8;
-                ftv = (ftv >> 3) + 1;
+                uint16_t ftv = v & 0xFFE0;
+                ftv = (ftv >> 5) + 1;
                 auto fft = static_cast<ixion::formula_function_t>(ftv);
                 std::ostringstream os;
                 os << "<func:" << ixion::get_formula_function_name(fft) << ">";
                 decoded.push_back(os.str());
                 break;
             }
-            case t_name:
-                decoded.push_back("<name>");
-                break;
-            case t_operator:
-            {
-                // Extract the operator token value.
-                uint16_t otv = v & 0xFFF8;
-                otv = (otv >> 3) + 1;
-                auto ot = static_cast<formula_op_t>(otv);
-                decoded.push_back(to_string(ot).str());
-                break;
-            }
-            case t_reference:
-                decoded.push_back("<ref>");
-                break;
-            case t_value:
-                decoded.push_back("<value>");
-                break;
             default:
-                throw std::logic_error("wrong token type!");
+            {
+                decoded.push_back(to_string(op).str());
+            }
         }
     }
 

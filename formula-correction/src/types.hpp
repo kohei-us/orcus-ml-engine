@@ -9,6 +9,7 @@
 
 #include <cstdint>
 #include <orcus/pstring.hpp>
+#include <ixion/formula_opcode.hpp>
 
 enum formula_token_t : uint8_t
 {
@@ -21,29 +22,9 @@ enum formula_token_t : uint8_t
     t_value,       // 6
 };
 
-enum formula_op_t : uint8_t
-{
-    op_unknown = 0,   // 0
-    op_plus,          // 1
-    op_minus,         // 2
-    op_divide,        // 3
-    op_multiply,      // 4
-    op_exponent,      // 5
-    op_concat,        // 6
-    op_equal,         // 7
-    op_not_equal,     // 8
-    op_less,          // 9
-    op_greater,       // 10
-    op_less_equal,    // 11
-    op_greater_equal, // 12
-    op_open,          // 13
-    op_close,         // 14
-    op_sep,           // 15
-};
+ixion::fopcode_t  to_formula_op(const char* p, size_t n);
 
-formula_op_t to_formula_op(const char* p, size_t n);
-
-orcus::pstring to_string(formula_op_t v);
+orcus::pstring to_string(ixion::fopcode_t v);
 
 formula_token_t to_formula_token(const char* p, size_t n);
 
