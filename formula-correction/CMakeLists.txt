@@ -9,6 +9,8 @@ find_package(PkgConfig REQUIRED)
 find_package(Threads)
 find_package(Python3 COMPONENTS Interpreter Development)
 
+include(GNUInstallDirs)
+
 if(Python3_FOUND)
     message(STATUS "python3 include dirs: ${Python3_INCLUDE_DIRS}")
     message(STATUS "python3 library dirs: ${Python3_LIBRARY_DIRS}")

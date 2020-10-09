@@ -35,3 +35,4 @@ install(TARGETS formula-data-parser formula-data-interpreter collect-tokens
     ARCHIVE DESTINATION ${CMAKE_INSTALL_LIBDIR}
 )
 
+add_subdirectory(python)
