@@ -20,6 +20,18 @@ using std::cout;
 using std::cerr;
 using std::endl;
 
+trie_loader::mode_type to_mode_enum(const std::string& s)
+{
+    const char* names[] = { "name", "symbol", "value" };
+    size_t n = ORCUS_N_ELEMENTS(names);
+
+    for (size_t i = 0; i < n; ++i)
+        if (s == names[i])
+            return static_cast<trie_loader::mode_type>(i);
+
+    return trie_loader::mode_type::UNKNOWN;
+}
+
 int main(int argc, char** argv)
 {
     bool verbose = false;
@@ -28,6 +40,7 @@ int main(int argc, char** argv)
     desc.add_options()
         ("help,h", "Print this help.")
         ("verbose,v", po::bool_switch(&verbose), "Verbose output.")
+        ("mode,m", po::value<std::string>(), "Interpretation mode. Either choose 'name', 'symbol' or 'value'.")
         ("output,o", po::value<std::string>(), "Output file.");
 
     po::options_description hidden("Hidden options");
@@ -64,6 +77,20 @@ int main(int argc, char** argv)
     if (!vm.count("input-file"))
         return EXIT_SUCCESS;
 
+    trie_loader::mode_type mode = trie_loader::NAME;
+    if (vm.count("mode"))
+    {
+        std::string mode_s = vm["mode"].as<std::string>();
+        mode = to_mode_enum(mode_s);
+
+        if (mode == trie_loader::UNKNOWN)
+        {
+            cout << "invalid mode: " << mode_s << endl;
+            return EXIT_FAILURE;
+        }
+    }
+
+
     trie_loader trie;
 
     {
@@ -83,7 +110,7 @@ int main(int argc, char** argv)
         is = output.get();
     }
 
-    trie.dump(*is);
+    trie.dump(*is, mode);
 
     return EXIT_SUCCESS;
 }

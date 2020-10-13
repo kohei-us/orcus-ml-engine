@@ -19,13 +19,16 @@ class trie_loader
     map_type m_trie;
 
 public:
+
+    enum mode_type { UNKNOWN = -1, NAME = 0, SYMBOL = 1, VALUE = 2 };
+
     trie_loader();
 
     void load(std::istream& is);
 
     size_t size() const;
 
-    void dump(std::ostream& os) const;
+    void dump(std::ostream& os, mode_type mode) const;
 };
 
 /* vim:set shiftwidth=4 softtabstop=4 expandtab: */

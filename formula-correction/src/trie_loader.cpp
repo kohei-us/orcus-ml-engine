@@ -65,15 +65,31 @@ size_t trie_loader::size() const
     return m_trie.size();
 }
 
-void trie_loader::dump(std::ostream& os) const
+void trie_loader::dump(std::ostream& os, mode_type mode) const
 {
-    for (const auto& entry : m_trie)
+    switch (mode)
     {
-        const std::vector<uint16_t>& tokens = entry.first;
-        for (const std::string& s : decode_tokens(tokens))
-            os << s << ' ';
+        case NAME:
+        {
+            for (const auto& entry : m_trie)
+            {
+                const std::vector<uint16_t>& tokens = entry.first;
+                for (const std::string& s : decode_tokens(tokens))
+                    os << s << ' ';
 
-        os << '(' << entry.second << ')' << endl;
+                os << '(' << entry.second << ')' << endl;
+            }
+
+            break;
+        }
+        case SYMBOL:
+        {
+            break;
+        }
+        case VALUE:
+        {
+            break;
+        }
     }
 }
 
