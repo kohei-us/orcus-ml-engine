@@ -26,6 +26,8 @@ ixion::fopcode_t  to_formula_op(const char* p, size_t n);
 
 orcus::pstring to_string(ixion::fopcode_t v);
 
+orcus::pstring to_symbol(ixion::fopcode_t v);
+
 formula_token_t to_formula_token(const char* p, size_t n);
 
 /* vim:set shiftwidth=4 softtabstop=4 expandtab: */

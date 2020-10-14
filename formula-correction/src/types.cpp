@@ -124,6 +124,40 @@ orcus::pstring to_string(ixion::fopcode_t v)
     return op_type::str(v);
 }
 
+orcus::pstring to_symbol(ixion::fopcode_t v)
+{
+    const char* symbols[] = {
+        "???", // fop_unknown = 0,
+        "ref", // fop_single_ref,
+        "ref:ref", // fop_range_ref,
+        "ref[]", // fop_table_ref,
+        "name", // fop_named_expression,
+        "\"str\"", // fop_string,
+        "1", // fop_value,
+        "func", // fop_function,
+        "+", // fop_plus,
+        "-", // fop_minus,
+        "/", // fop_divide,
+        "*", // fop_multiply,
+        "^", // fop_exponent,
+        "&", // fop_concat,
+        "=", // fop_equal,
+        "<>", // fop_not_equal,
+        "<", // fop_less,
+        ">", // fop_greater,
+        "<=", // fop_less_equal,
+        ">=", // fop_greater_equal,
+        "(", // fop_open,
+        ")", // fop_close,
+        ",", // fop_sep,
+        "error", // fop_error,
+    };
+
+    const char* p = symbols[v];
+    size_t n = strlen(p);
+    return orcus::pstring(p, n);
+}
+
 formula_token_t to_formula_token(const char* p, size_t n)
 {
     return token_type::get().find(p, n);
