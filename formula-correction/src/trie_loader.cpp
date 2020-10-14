@@ -140,6 +140,18 @@ void trie_loader::dump(std::ostream& os, mode_type mode) const
         }
         case VALUE:
         {
+            for (const auto& entry : m_trie)
+            {
+                // number of occurrences as the first value in each line.
+                os << entry.second << ' ';
+
+                // No decoding - print the token values.
+                for (const uint16_t v : entry.first)
+                    os << v << ' ';
+
+                os << endl;
+            }
+
             break;
         }
     }
