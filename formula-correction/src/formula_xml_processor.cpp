@@ -184,7 +184,8 @@ class xml_handler : public orcus::sax_token_handler
                 m_filepath = attr.transient ? m_str_pool.intern(attr.value).first : attr.value;
         }
 
-        m_tc.debug_output << m_filepath << endl;
+        m_tc.debug_output << "- filepath: " << m_filepath << endl
+            << "  formulas:" << endl;
     }
 
     void end_doc()
@@ -311,7 +312,10 @@ class xml_handler : public orcus::sax_token_handler
             }
         }
 
-        m_tc.debug_output << sheet << ',' << row << ',' << column << ": " << formula << endl;
+        m_tc.debug_output << "    - sheet: " << sheet << endl
+            << "      row: " << row << endl
+            << "      column: " << column << endl
+            << "      formula: " << formula << endl;
 
         if (!m_valid_formula)
         {
@@ -336,6 +340,8 @@ class xml_handler : public orcus::sax_token_handler
 
         if (m_tc.debug_output)
         {
+            m_tc.debug_output << "      tokens: ";
+
             for (const std::string& ts : decode_tokens_to_names(m_formula_tokens))
                 m_tc.debug_output << ts << ' ';
             m_tc.debug_output << endl;
