@@ -7,6 +7,7 @@
 
 #include "formula_xml_processor.hpp"
 #include "types.hpp"
+#include "token_decoder.hpp"
 
 #include <mdds/sorted_string_map.hpp>
 #include <orcus/sax_token_parser.hpp>
@@ -103,6 +104,7 @@ class xml_handler : public orcus::sax_token_handler
     using str_counter_t = std::map<pstring, uint32_t>;
 
     std::ostringstream& m_co; // console output buffer
+    formula_xml_processor::thread_context& m_tc;
 
     std::vector<xml_name_t> m_stack;
     std::vector<uint16_t> m_formula_tokens;
@@ -181,6 +183,8 @@ class xml_handler : public orcus::sax_token_handler
             if (attr.name == XML_filepath)
                 m_filepath = attr.transient ? m_str_pool.intern(attr.value).first : attr.value;
         }
+
+        m_tc.debug_output << m_filepath << endl;
     }
 
     void end_doc()
@@ -283,7 +287,7 @@ class xml_handler : public orcus::sax_token_handler
     {
         check_parent(parent, XML_formulas);
 
-        pstring formula, sheet;
+        pstring formula, sheet, row, column;
 
         for (const auto& attr : elem.attrs)
         {
@@ -295,11 +299,19 @@ class xml_handler : public orcus::sax_token_handler
                 case XML_sheet:
                     sheet = attr.value;
                     break;
+                case XML_row:
+                    row = attr.value;
+                    break;
+                case XML_column:
+                    column = attr.value;
+                    break;
                 case XML_valid:
                     m_valid_formula = attr.value == "true";
                     break;
             }
         }
+
+        m_tc.debug_output << sheet << ',' << row << ',' << column << ": " << formula << endl;
 
         if (!m_valid_formula)
         {
@@ -322,6 +334,12 @@ class xml_handler : public orcus::sax_token_handler
         if (m_verbose)
             m_co << "    * formula tokens: " << m_formula_tokens.size() << endl;
 
+        if (m_tc.debug_output)
+        {
+            for (const std::string& ts : decode_tokens_to_names(m_formula_tokens))
+                m_tc.debug_output << ts << ' ';
+            m_tc.debug_output << endl;
+        }
         m_trie.insert_formula(m_formula_tokens);
     }
 
@@ -411,8 +429,9 @@ class xml_handler : public orcus::sax_token_handler
 
 public:
 
-    xml_handler(bool verbose, std::ostringstream& co) :
+    xml_handler(bool verbose, std::ostringstream& co, formula_xml_processor::thread_context& tc) :
         m_co(co),
+        m_tc(tc),
         m_verbose(verbose) {}
 
     void start_element(const orcus::xml_token_element_t& elem)
@@ -538,7 +557,7 @@ trie_builder formula_xml_processor::parse_file(const std::string& filepath, thre
 
     orcus::xmlns_repository repo;
     auto cxt = repo.create_context();
-    xml_handler hdl(m_verbose, co);
+    xml_handler hdl(m_verbose, co, tc);
     orcus::tokens token_map(token_labels, ORCUS_N_ELEMENTS(token_labels));
     orcus::sax_token_parser<xml_handler> parser(content.data(), content.size(), token_map, cxt, hdl);
 

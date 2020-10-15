@@ -16,6 +16,7 @@
 
 class formula_xml_processor
 {
+public:
     using paths_type = std::vector<std::string>;
     using path_pos_pair_type = std::pair<paths_type::const_iterator, paths_type::const_iterator>;
 

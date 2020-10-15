@@ -2,12 +2,14 @@
 add_executable(formula-data-parser
     formula_data_parser.cpp
     formula_xml_processor.cpp
+    token_decoder.cpp
     trie_builder.cpp
     types.cpp
 )
 
 add_executable(formula-data-interpreter
     formula_data_interpreter.cpp
+    token_decoder.cpp
     trie_loader.cpp
     types.cpp
 )
