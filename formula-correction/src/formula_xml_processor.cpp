@@ -502,13 +502,6 @@ public:
 
 } // anonymous namespace
 
-void formula_xml_processor::launch_queue_dispatcher_thread(
-    queue_type* queue, const std::vector<std::string>& filepaths)
-{
-    for (const std::string& filepath : filepaths)
-        queue->push(&formula_xml_processor::parse_file, this, filepath);
-}
-
 trie_builder formula_xml_processor::launch_worker_thread(const path_pos_pair_type& filepaths)
 {
     trie_builder trie;
@@ -561,84 +554,50 @@ formula_xml_processor::formula_xml_processor(const fs::path& outdir, bool verbos
 
 void formula_xml_processor::parse_files(const std::vector<std::string>& filepaths)
 {
-    switch (m_thread_policy)
+    size_t worker_count = std::thread::hardware_concurrency();
+    size_t data_size = filepaths.size() / worker_count;
+
+    // Split the data load evenly.
+    std::vector<path_pos_pair_type> filepaths_set(worker_count);
+    auto pos = filepaths.begin();
+    auto end = pos;
+    std::advance(end, data_size);
+
+    for (size_t i = 0; i < worker_count - 1; ++i)
     {
-        case thread_policy::disabled:
-        {
-            for (const std::string& filepath : filepaths)
-            {
-                trie_builder trie = parse_file(filepath);
-                m_trie.merge(trie);
-            }
-
-            break;
-        }
-        case thread_policy::linear_async:
-        {
-            size_t file_count = filepaths.size();
-
-            queue_type queue(32);
-
-            std::thread t(&formula_xml_processor::launch_queue_dispatcher_thread, this, &queue, filepaths);
-            scoped_guard guard(std::move(t));
-
-            for (size_t i = 0; i < file_count; ++i)
-            {
-                trie_builder trie = queue.get_one();
-                m_trie.merge(trie);
-            }
-            break;
-        }
-        case thread_policy::split_load:
-        {
-            size_t worker_count = std::thread::hardware_concurrency();
-            size_t data_size = filepaths.size() / worker_count;
-
-            // Split the data load evenly.
-            std::vector<path_pos_pair_type> filepaths_set(worker_count);
-            auto pos = filepaths.begin();
-            auto end = pos;
-            std::advance(end, data_size);
-
-            for (size_t i = 0; i < worker_count - 1; ++i)
-            {
-                auto& set = filepaths_set[i];
-                set.first = pos;
-                set.second = end;
-                pos = end;
-                std::advance(end, data_size);
-            }
-
-            end = filepaths.end();
-            filepaths_set.back().first = pos;
-            filepaths_set.back().second = end;
-
-            using future_type = std::future<trie_builder>;
-
-            std::vector<future_type> futures;
-
-            // Dispatch the worker threads.
-            for (size_t i = 0; i < worker_count; ++i)
-            {
-                auto future = std::async(
-                    std::launch::async, &formula_xml_processor::launch_worker_thread, this, filepaths_set[i]);
-
-                futures.push_back(std::move(future));
-            }
-
-            // Wait on all worker threads.
-
-            for (future_type& future : futures)
-            {
-                trie_builder trie = future.get();
-                m_trie.merge(trie);
-            }
-
-            std::cout << "total entries: " << m_trie.size() << endl;
-
-            break;
-        }
+        auto& set = filepaths_set[i];
+        set.first = pos;
+        set.second = end;
+        pos = end;
+        std::advance(end, data_size);
     }
+
+    end = filepaths.end();
+    filepaths_set.back().first = pos;
+    filepaths_set.back().second = end;
+
+    using future_type = std::future<trie_builder>;
+
+    std::vector<future_type> futures;
+
+    // Dispatch the worker threads.
+    for (size_t i = 0; i < worker_count; ++i)
+    {
+        auto future = std::async(
+            std::launch::async, &formula_xml_processor::launch_worker_thread, this, filepaths_set[i]);
+
+        futures.push_back(std::move(future));
+    }
+
+    // Wait on all worker threads.
+
+    for (future_type& future : futures)
+    {
+        trie_builder trie = future.get();
+        m_trie.merge(trie);
+    }
+
+    std::cout << "total entries: " << m_trie.size() << endl;
 }
 
 void formula_xml_processor::write_files()
