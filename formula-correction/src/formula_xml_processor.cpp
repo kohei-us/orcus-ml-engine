@@ -502,7 +502,7 @@ public:
 
 } // anonymous namespace
 
-trie_builder formula_xml_processor::launch_worker_thread(const path_pos_pair_type& filepaths)
+trie_builder formula_xml_processor::launch_worker_thread(const path_pos_pair_type& filepaths) const
 {
     trie_builder trie;
 
@@ -517,13 +517,14 @@ trie_builder formula_xml_processor::launch_worker_thread(const path_pos_pair_typ
     return trie;
 }
 
-trie_builder formula_xml_processor::parse_file(const std::string& filepath)
+trie_builder formula_xml_processor::parse_file(const std::string& filepath) const
 {
     std::ostringstream co; // console output
 
     orcus::file_content content(filepath.data());
     co << "--" << endl;
     co << "filepath: " << filepath << " (size: " << content.size() << ")" << endl;
+    co << "thread ID: " << std::this_thread::get_id() << endl;
 
     orcus::xmlns_repository repo;
     auto cxt = repo.create_context();

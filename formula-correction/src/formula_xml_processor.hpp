@@ -24,9 +24,9 @@ private:
     boost::filesystem::path m_outdir;
     const bool m_verbose;
 
-    trie_builder launch_worker_thread(const path_pos_pair_type& filepaths);
+    trie_builder launch_worker_thread(const path_pos_pair_type& filepaths) const;
 
-    trie_builder parse_file(const std::string& filepath);
+    trie_builder parse_file(const std::string& filepath) const;
 
 public:
 
