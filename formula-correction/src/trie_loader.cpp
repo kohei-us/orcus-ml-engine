@@ -37,7 +37,7 @@ std::vector<std::string> decode_tokens_to_names(const std::vector<uint16_t>& tok
                 ftv = (ftv >> 5) + 1;
                 auto fft = static_cast<ixion::formula_function_t>(ftv);
                 std::ostringstream os;
-                os << "<func:" << ixion::get_formula_function_name(fft) << ">";
+                os << "func:" << ixion::get_formula_function_name(fft);
                 decoded.push_back(os.str());
                 break;
             }
