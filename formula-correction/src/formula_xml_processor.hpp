@@ -19,18 +19,27 @@ class formula_xml_processor
     using paths_type = std::vector<std::string>;
     using path_pos_pair_type = std::pair<paths_type::const_iterator, paths_type::const_iterator>;
 
+    struct thread_context
+    {
+        std::ofstream debug_output;
+    };
+
 private:
     trie_builder m_trie;
-    boost::filesystem::path m_outdir;
+    boost::filesystem::path m_output_dir;
+    boost::filesystem::path m_debug_dir;
     const bool m_verbose;
 
     trie_builder launch_worker_thread(const path_pos_pair_type& filepaths) const;
 
-    trie_builder parse_file(const std::string& filepath) const;
+    trie_builder parse_file(const std::string& filepath, thread_context& tc) const;
 
 public:
 
-    formula_xml_processor(const boost::filesystem::path& outdir, bool verbose);
+    formula_xml_processor(
+        const boost::filesystem::path& output_dir,
+        const boost::filesystem::path& debug_dir,
+        bool verbose);
 
     formula_xml_processor(const formula_xml_processor&) = delete;
 

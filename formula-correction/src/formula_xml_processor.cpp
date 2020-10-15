@@ -505,11 +505,22 @@ public:
 trie_builder formula_xml_processor::launch_worker_thread(const path_pos_pair_type& filepaths) const
 {
     trie_builder trie;
+    thread_context tc;
+
+    if (!m_debug_dir.empty())
+    {
+        // Create a debug log file.
+        std::ostringstream filename;
+        filename << std::this_thread::get_id() << ".log";
+
+        fs::path debug_file_path = m_debug_dir / filename.str();
+        tc.debug_output.open(debug_file_path.string(), std::ios::binary);
+    }
 
     std::for_each(filepaths.first, filepaths.second,
-        [&trie, this](const std::string& filepath)
+        [&trie, &tc, this](const std::string& filepath)
         {
-            trie_builder this_trie = parse_file(filepath);
+            trie_builder this_trie = parse_file(filepath, tc);
             trie.merge(this_trie);
         }
     );
@@ -517,14 +528,13 @@ trie_builder formula_xml_processor::launch_worker_thread(const path_pos_pair_typ
     return trie;
 }
 
-trie_builder formula_xml_processor::parse_file(const std::string& filepath) const
+trie_builder formula_xml_processor::parse_file(const std::string& filepath, thread_context& tc) const
 {
     std::ostringstream co; // console output
 
     orcus::file_content content(filepath.data());
     co << "--" << endl;
     co << "filepath: " << filepath << " (size: " << content.size() << ")" << endl;
-    co << "thread ID: " << std::this_thread::get_id() << endl;
 
     orcus::xmlns_repository repo;
     auto cxt = repo.create_context();
@@ -550,8 +560,11 @@ trie_builder formula_xml_processor::parse_file(const std::string& filepath) cons
     return trie;
 }
 
-formula_xml_processor::formula_xml_processor(const fs::path& outdir, bool verbose) :
-    m_outdir(outdir), m_verbose(verbose) {}
+formula_xml_processor::formula_xml_processor(
+    const fs::path& output_dir, const fs::path& debug_dir, bool verbose) :
+    m_output_dir(output_dir),
+    m_debug_dir(debug_dir),
+    m_verbose(verbose) {}
 
 void formula_xml_processor::parse_files(const std::vector<std::string>& filepaths)
 {
@@ -603,7 +616,7 @@ void formula_xml_processor::parse_files(const std::vector<std::string>& filepath
 
 void formula_xml_processor::write_files()
 {
-    fs::path p = m_outdir / "formula-tokens.bin";
+    fs::path p = m_output_dir / "formula-tokens.bin";
     std::ofstream of(p.string());
     m_trie.write(of);
 }

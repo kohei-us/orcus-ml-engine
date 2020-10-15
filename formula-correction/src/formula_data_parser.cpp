@@ -26,6 +26,7 @@ int main(int argc, char** argv)
     desc.add_options()
         ("help,h", "Print this help.")
         ("verbose,v", po::bool_switch(&verbose), "Verbose output.")
+        ("debug,d", po::value<std::string>(), "Debug output directory.")
         ("output,o", po::value<std::string>(), "Output directory.");
 
     po::options_description hidden("Hidden options");
@@ -69,11 +70,11 @@ int main(int argc, char** argv)
         return EXIT_SUCCESS;
 
     std::vector<std::string> input_files = vm["input-files"].as<std::vector<std::string>>();
-    fs::path outdir(vm["output"].as<std::string>());
+    fs::path output_dir(vm["output"].as<std::string>());
 
     try
     {
-        fs::create_directory(outdir);
+        fs::create_directory(output_dir);
     }
     catch (const fs::filesystem_error& e)
     {
@@ -81,7 +82,24 @@ int main(int argc, char** argv)
         return EXIT_FAILURE;
     }
 
-    formula_xml_processor p(outdir, verbose);
+    fs::path debug_dir;
+
+    if (vm.count("debug"))
+    {
+        debug_dir = vm["debug"].as<std::string>();
+
+        try
+        {
+            fs::create_directory(debug_dir);
+        }
+        catch (const fs::filesystem_error& e)
+        {
+            cerr << e.what() << endl;
+            return EXIT_FAILURE;
+        }
+    }
+
+    formula_xml_processor p(output_dir, debug_dir, verbose);
     p.parse_files(input_files);
     p.write_files();
 
