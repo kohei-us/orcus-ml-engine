@@ -66,4 +66,20 @@ Once built, run:
 ```
 ./install/bin/formula-data-parser -o out formulas/*.xml
 ```
-and the formula token data will be written to the `out` directory.
+and the formula token data will be written to the `out` directory as `formula-tokens.bin`.
+This binary file contains a compressed and encoded representation of all extracted
+formula expressions.
+
+
+### Generate token names file.
+
+Next step is to create a file that contains text representations of token names from
+the aforementioned binary file.  To do it, simply run:
+
+```
+./install/bin/formula-data-interpreter -m name -o out/token-names.txt out/formula-tokens.bin
+```
+
+and the output file named `out/token-names.txt` will contain a sequence of token names
+per line, with the first number being the number of occurrences of that particular
+formula expresssion in all processed input documents.
