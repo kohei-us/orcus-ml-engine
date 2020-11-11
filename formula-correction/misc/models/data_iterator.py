@@ -37,9 +37,16 @@ def main():
         fex = _FormulaExample(n, tokens)
         examples.append(fex)
 
-    fields = [("formula-tokens", Field(sequential=True, use_vocab=True, eos_token="<eos>")),]
+    formula_tokens_field = Field(sequential=True, use_vocab=True, eos_token="<eos>")
+    fields = [("formula_tokens", formula_tokens_field),]
     ds = Dataset(examples, fields)
     print(f"dataset contains {len(ds)} examples.")
+
+    # build vocabulary
+    formula_tokens_field.build_vocab(ds, min_freq=1)
+
+    print(formula_tokens_field.vocab.itos)  # index to string
+    print(formula_tokens_field.vocab.stoi)  # string to index
 
     # Sample the first 10 examples
     for i, ex in enumerate(ds):
