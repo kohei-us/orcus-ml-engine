@@ -9,6 +9,14 @@
 
 import argparse
 from pathlib import Path
+from torchtext.data import Example, Field, Dataset
+
+
+class _FormulaExample(Example):
+
+    def __init__(self, count, formula_tokens):
+        self.count = count  # number of occurrences
+        self.formula_tokens = formula_tokens
 
 
 def get_input_data(filepath):
@@ -24,8 +32,20 @@ def main():
     parser.add_argument("filepath", type=Path)
     args = parser.parse_args()
 
+    examples = list()
     for n, tokens in get_input_data(args.filepath):
-        print(n, tokens)
+        fex = _FormulaExample(n, tokens)
+        examples.append(fex)
+
+    fields = [("formula-tokens", Field(sequential=True, use_vocab=True, eos_token="<eos>")),]
+    ds = Dataset(examples, fields)
+    print(f"dataset contains {len(ds)} examples.")
+
+    # Sample the first 10 examples
+    for i, ex in enumerate(ds):
+        print(ex.formula_tokens)
+        if i == 10:
+            break
 
 
 if __name__ == "__main__":
